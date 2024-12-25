@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <!-- Include the CesiumJS JavaScript and CSS files -->
+    <script src="https://cesium.com/downloads/cesiumjs/releases/1.107.1/Build/Cesium/Cesium.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/satellite.js/4.0.0/satellite.min.js"></script>
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"></script>
+    <link rel="shortcut icon" href="#">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+
+    <link href="https://cesium.com/downloads/cesiumjs/releases/1.107.1/Build/Cesium/Widgets/widgets.css"
+        rel="stylesheet">
+
+</head>
+
+<body>
+    <div id="cesiumContainer"></div>
+    <script type="module">
+        async function main() {
+            // convert radians to degrees
+            function r2d(radians, n) {
+                const num = radians * (180 / Math.PI);
+                return Math.round(num * Math.pow(10, n)) / Math.pow(10, n)
+            }
+
+
+            async function get_data_buffer() {
+                return new Promise((resolve) => {
+                    window.addEventListener("message", function handleMessage(event) {
+                        const data = event.data;
+                        resolve(data);
+                    });
+                });
+            }
+
+
+            // Cesium Viewer Setup
+            Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI4ZjM0YTMzOC04NTIwLTQwMTItYTg5Ni0wOTFhNjlkZTJiYzIiLCJpZCI6MTUzNzcwLCJpYXQiOjE2ODkyNjg2NjV9.JHjxyoN8RovBonODf3w6B654ZNhxvoqCbAqAsKZrxBY'
+            const viewer = new Cesium.Viewer('cesiumContainer', {
+                terrain: Cesium.Terrain.fromWorldTerrain(),
+            });
+
+
+            // Getting Data Over Time
+            const data = await get_data_buffer();
+            const data_readings = data.dataBuffer;
+            const cur_loc = data.location;
+            const len_data = Object.keys(data_readings).length - 1; // 237
+
+            // Plotting data using databuffer 
+            const start = Cesium.JulianDate.fromIso8601(data_readings[0].iso_string); // 2024-11-30T08:01:20Z
+            const stop = Cesium.JulianDate.fromIso8601(data_readings[len_data - 1].iso_string); // 2024-11-30T15:53:20Z
+
+            const positionsOverTime = new Cesium.SampledPositionProperty();
+            for (let i = 0; i < len_data; i++) { // 237
+                const instance = data_readings[i];
+                const time = Cesium.JulianDate.fromIso8601(instance.iso_string);
+                const position = Cesium.Cartesian3.fromDegrees(instance.longitude, instance.latitude, instance.height * 1000);
+                positionsOverTime.addSample(time, position)
+            }
+
+            // Visualize the satellite with a dot and orbit.
+
+            const orbit = viewer.entities.add({
+                availability: new Cesium.TimeIntervalCollection([new Cesium.TimeInterval({ start: start, stop: stop })]),
+                position: positionsOverTime,
+
+
+            });
+
+            var ps = viewer.entities.add({
+                position: new Cesium.Cartesian3.fromDegrees(cur_loc.lon, cur_loc.lat),
+                point: {
+                    pixelSize: 6,
+                    color: Cesium.Color.RED,
+                }
+            });
+
+            const fixedPolyline = Cesium.Cartesian3.fromDegreesArrayHeights(data_readings['geodetic']);
+            const redLine = viewer.entities.add({
+                polyline: {
+                    // This callback updates positions each frame.
+                    positions: new Cesium.CallbackProperty(function (time, result) {
+                        var icrfToFixed = Cesium.Transforms.computeIcrfToFixedMatrix(time);
+                        var icrfToFixed = Cesium.Transforms.computeIcrfToFixedMatrix(time);
+                        if (Cesium.defined(icrfToFixed)) {
+                            let pos = [];
+                            for (let i = 0; i < fixedPolyline.length; i++) {
+                                let new_point = (Cesium.Matrix3.multiplyByVector(icrfToFixed, fixedPolyline[i], new Cesium.Cartesian3()));
+                                var cartographic = Cesium.Cartographic.fromCartesian(new_point);
+                                pos = pos.concat(Cesium.Math.toDegrees(cartographic.longitude), Cesium.Math.toDegrees(cartographic.latitude), cartographic.height);
+                            }
+                            // console.log(pos)
+                            return Cesium.Cartesian3.fromDegreesArrayHeights(pos,);
+                        }
+                    }, false),
+                    width: 2,
+                    material: new Cesium.PolylineGlowMaterialProperty({
+                        glowPower: 2,
+                        color: Cesium.Color.YELLOW,
+                    }),
+                },
+            });
+
+
+
+
+            // fetching live data from server 
+            const div_data = document.getElementById('data'); // null
+            console.log(cur_loc.lat)  // undefined
+
+            // Set the camera to follow the satellite 
+            // viewer.trackedEntity = orbit; 
+
+            let initialized = false;
+            viewer.scene.globe.tileLoadProgressEvent.addEventListener(() => {
+                if (!initialized && viewer.scene.globe.tilesLoaded === true) {
+                    viewer.clock.shouldAnimate = true;
+                    initialized = true;
+                    viewer.scene.camera.zoomOut(7000000);    // Wait for globe to load then zoom out 
+                }
+            });
+
+            // setting camera to ICRF
+            const scene = viewer.scene;
+            const clock = viewer.clock;
+
+            function icrf(scene, time) {
+                if (scene.mode !== Cesium.SceneMode.SCENE3D) { return; }
+
+                const icrfToFixed = Cesium.Transforms.computeIcrfToFixedMatrix(time);
+                if (Cesium.defined(icrfToFixed)) {
+                    const camera = viewer.camera;
+                    const offset = Cesium.Cartesian3.clone(camera.position);
+                    const transform = Cesium.Matrix4.fromRotationTranslation(
+                        icrfToFixed
+                    );
+                    camera.lookAtTransform(transform, offset);
+                }
+            }
+
+            function viewInICRF() {
+                viewer.camera.flyHome(0);
+                //clock.multiplier = 3 * 60;
+                scene.postUpdate.addEventListener(icrf);
+
+            }
+            //viewInICRF();
+            var location2 = {}
+            const successCallback = (position) => {
+                location2 = position.coords;
+                //console.log(location);
+
+            };
+
+            const errorCallback = (error) => {
+                console.log(error);
+            };
+
+            // ADDING SATELLITE 3D OBJECT
+            async function loadModel() {
+                // Load the glTF model from Cesium ion.
+                const satelliteUri = await Cesium.IonResource.fromAssetId(2099905);
+                const satelliteEntity = viewer.entities.add({
+                    position: positionsOverTime,
+
+                    model: {
+                        uri: satelliteUri,
+                        minimumPixelSize: 50028,
+                        maximumScale: 90000,
+                    },
+                    orientation: new Cesium.VelocityOrientationProperty(positionsOverTime),
+                    path: new Cesium.PathGraphics({ width: 3 })
+                });
+
+            }
+
+            var footPrintIntervalIDs = []
+            var satelliteNameIntervalIDMap = {}
+            var previousPointsOffNadirPoints = {};
+            var globalFootPrintCollectionArray = [];                                            // sensor.swath not define
+            var instrument = { 'off_nadir_angle': 0.2, 'off_nadir_direction': 0, 'swath_width': 16, 'resolution': 0.28, 'speed': 7000 };
+            instrument['swath_width'] *= 1000;
+
+            function getGroundCartesian(cartesian) {
+
+                var cartographic = Cesium.Cartographic.fromCartesian(cartesian);
+                var longitude = Cesium.Math.toDegrees(cartographic.longitude);
+                var latitude = Cesium.Math.toDegrees(cartographic.latitude);
+
+                var groundCartesian = Cesium.Cartesian3.fromDegrees(longitude, latitude);
+                return groundCartesian
+            }
+            function getHeading(origin, destination) {
+                var direction;
+                if (origin.latitude < destination.latitude) {
+                    direction = "North"
+                } else {
+                    direction = "South"
+                }
+                return direction;
+            }
+
+            function sinDegrees(angle) { return Math.sin(angle / 180 * Math.PI); };
+
+            function drawPoint(cartesian, label, color) {
+                var entity = viewer.entities.add({
+                    position: cartesian,
+                    name: label,
+                    point: {
+                        pixelSize: 3,
+                        color: color
+                    }
+                });
+                return entity;
+            }
+            function drawLine(cartesian1, cartesian2, label, followSurface) {
+
+                var cartographic1 = Cesium.Cartographic.fromCartesian(cartesian1);
+                var longitude1 = Cesium.Math.toDegrees(cartographic1.longitude);
+                var latitude1 = Cesium.Math.toDegrees(cartographic1.latitude);
+                var height1 = cartographic1.height;
+
+
+                var cartographic2 = Cesium.Cartographic.fromCartesian(cartesian2);
+                var longitude2 = Cesium.Math.toDegrees(cartographic2.longitude);
+                var latitude2 = Cesium.Math.toDegrees(cartographic2.latitude);
+                var height2 = cartographic2.height;
+
+                var entity = viewer.entities.add({
+                    name: label,
+                    polyline: {
+                        positions: Cesium.Cartesian3.fromDegreesArrayHeights([longitude1, latitude1, height1,
+                            longitude2, latitude2, height2]),
+                        width: 1,
+                        followSurface: followSurface,
+                        material: Cesium.Color.YELLOW
+                    }
+                });
+                return entity;
+            }
+
+
+            function drawOffNadirPolygon(points1, points2, satelliteName, validOverpass) {
+
+                var color;
+                if (validOverpass) {
+                    color = Cesium.Color.fromAlpha(Cesium.Color.GREEN, 0.2)
+                } else {
+                    color = Cesium.Color.fromAlpha(Cesium.Color.RED, 0.2)
+                }
+
+                var p1, p2, p3, p4;
+                if (satelliteName == 'AEOLUS') {
+                    p1 = points1[2];
+                    p2 = points1[3];
+                    p3 = points2[3];
+                    p4 = points2[2];
+                } else {
+                    p1 = points1[3];
+                    p2 = points1[4];
+                    p3 = points2[4];
+                    p4 = points2[3];
+                }
+
+                var cesiumPolygon = viewer.entities.add({
+                    polygon: {
+                        hierarchy: [p1, p2, p3, p4],
+                        material: color
+                    }
+                });
+                return cesiumPolygon;
+            }
+
+
+
+            // TODO: Refactor, some functionality repeated from getSwathPoints
+            function drawOffNadirFootprint(satellite, instrument, timestamp) {
+
+                var satelliteName = 'CARTOSAT'
+
+                // get three points on the same plane
+                var A = satellite.getValue(timestamp);
+                var B = getGroundCartesian(A);
+                var C = satellite.getValue({ 'dayNumber': timestamp.dayNumber, 'secondsOfDay': timestamp.secondsOfDay + 120.0 });
+                // console.log(satellite.getValue);
+                // console.log(satellite.position)
+                // console.log(satellite)
+                if (C === undefined) {
+
+                    return;
+                }
+                var origin = Cesium.Cartographic.fromCartesian(A);
+                var destination = Cesium.Cartographic.fromCartesian(C);
+                var direction = getHeading(origin, destination);
+
+                // get two vectors on the plane using those points
+                var AB = new Cesium.Cartesian3(B.x - A.x, B.y - A.y, B.z - A.z);
+                var AC = new Cesium.Cartesian3(C.x - A.x, C.y - A.y, C.z - A.z);
+
+
+                // get a vector normal to the plane
+                var normal = new Cesium.Cartesian3();
+                Cesium.Cartesian3.cross(AB, AC, normal);
+
+
+
+                /*	if(direction == "South" && instrument.name != "SLSTR (Oblique)"){
+                  var newNormal = new Cesium.Cartesian3()
+                  newNormal = Cesium.Cartesian3.negate(normal, newNormal);
+                  normal = newNormal;
+                }*/
+
+                // get side of triangle opposite nadir angle
+                // @HACK temporary solution to enable swath view for nadir satellites
+                // @TODO The whole OPOT tool JS is an unholy mess needs massive cleaning and refactor
+                var angleA = isNaN(instrument.off_nadir_angle) ? 0.5 : instrument.off_nadir_angle;
+
+                var angleB = 90.0;
+
+                var sideC = Cesium.Cartesian3.distance(A, B);
+                var angleC = 180.0 - angleA - angleB;
+                // console.log(angleC)
+                var sinC = sinDegrees(angleC);
+                var sideB = sideC / sinC;
+                var sideA = Math.sqrt((sideB * sideB) - (sideC * sideC));
+
+                // get point perpendicular to satellite ground location, reassign it to C
+                var ray = new Cesium.Ray(B, normal);
+                C = Cesium.Ray.getPoint(ray, sideA);
+
+                // get point on ground defining end of satellites viewing area
+                var directionAC = new Cesium.Cartesian3();
+                Cesium.Cartesian3.subtract(C, A, directionAC);
+                var ray2 = new Cesium.Ray(A, directionAC);
+                var intersection = Cesium.IntersectionTests.rayEllipsoid(ray2, viewer.scene.globe.ellipsoid);
+                C = Cesium.Ray.getPoint(ray2, intersection.start);
+                // console.log(C, directionAC)
+                // TODO: Special case, only instruments which looks directly back
+                // along direction of travel. Needs refactoring to use off_nadir_angle
+                if (instrument.off_nadir_direction == 180.0 || instrument.off_nadir_direction == 0.0) {
+
+                    //// get plane perpendicular to travel
+
+                    // get two vectors on the plane using those points
+                    var AB = new Cesium.Cartesian3(B.x - A.x, B.y - A.y, B.z - A.z);
+                    var AC = new Cesium.Cartesian3(C.x - A.x, C.y - A.y, C.z - A.z);
+                    // console.log(AC)
+                    // get a vector normal to the plane
+                    var normal = new Cesium.Cartesian3();
+                    Cesium.Cartesian3.cross(AB, AC, normal);
+
+                    if (instrument.off_nadir_direction == 0.0) {
+                        var newNormal = new Cesium.Cartesian3()
+                        newNormal = Cesium.Cartesian3.negate(normal, newNormal);
+                        normal = newNormal;
+                    }
+
+                    // get side of triangle opposite nadir angle
+                    var angleA = instrument.off_nadir_angle; // off-nadir angle
+                    var angleB = 90.0;
+
+                    var sideC = Cesium.Cartesian3.distance(A, B);
+                    var angleC = 180.0 - angleA - angleB;
+                    var sinC = sinDegrees(angleC);
+                    var sideB = sideC / sinC;
+                    var sideA = Math.sqrt((sideB * sideB) - (sideC * sideC));
+
+                    // get point perpendicular to satellite ground location, reassign it to C
+                    var ray = new Cesium.Ray(B, normal);
+                    C = Cesium.Ray.getPoint(ray, sideA);
+
+                    // get point on ground defining end of satellites viewing area
+                    var directionAC = new Cesium.Cartesian3();
+                    Cesium.Cartesian3.subtract(C, A, directionAC);
+                    var ray2 = new Cesium.Ray(A, directionAC);
+                    var intersection = Cesium.IntersectionTests.rayEllipsoid(ray2, viewer.scene.globe.ellipsoid);
+                    C = Cesium.Ray.getPoint(ray2, intersection.start);
+                    //// get plane perpendicular satellite instrument line of site
+
+                    // get two vectors on the plane using those points
+                    var AB = new Cesium.Cartesian3(B.x - A.x, B.y - A.y, B.z - A.z);
+                    var AC = new Cesium.Cartesian3(C.x - A.x, C.y - A.y, C.z - A.z);
+
+                    // get a vector normal to the plane
+                    var normal = new Cesium.Cartesian3();
+                    Cesium.Cartesian3.cross(AB, AC, normal);
+
+                    var ray = new Cesium.Ray(C, normal);
+                    D = Cesium.Ray.getPoint(ray, instrument.swath_width / 2.0);
+                    E = Cesium.Ray.getPoint(ray, -instrument.swath_width / 2.0);
+                    // console.log(D,E)
+                    D = getGroundCartesian(D);
+                    E = getGroundCartesian(E);
+                    // console.log(D,E)
+
+
+
+                } else {
+                    // Special case, only instrument whose line of sight points to the side of the swath, rather than the middle
+                    if (satelliteName == "AEOLUS") {
+                        // get point on ground defining start of satellties viewing area
+                        var geodesic1 = new Cesium.EllipsoidGeodesic(Cesium.Cartographic.fromCartesian(C), Cesium.Cartographic.fromCartesian(B));
+                        var newCartographic1 = geodesic1.interpolateUsingSurfaceDistance(instrument.swath_width);
+                        var D = Cesium.Cartesian3.fromDegrees(Cesium.Math.toDegrees(newCartographic1.longitude), Cesium.Math.toDegrees(newCartographic1.latitude))
+                    } else {
+                        var geodesic1 = new Cesium.EllipsoidGeodesic(Cesium.Cartographic.fromCartesian(B), Cesium.Cartographic.fromCartesian(C));
+                        var newCartographic1 = geodesic1.interpolateUsingSurfaceDistance(geodesic1.surfaceDistance + instrument.swath_width / 2.0);
+                        var D = Cesium.Cartesian3.fromDegrees(Cesium.Math.toDegrees(newCartographic1.longitude), Cesium.Math.toDegrees(newCartographic1.latitude))
+
+                        var geodesic2 = new Cesium.EllipsoidGeodesic(Cesium.Cartographic.fromCartesian(C), Cesium.Cartographic.fromCartesian(B));
+                        var newCartographic2 = geodesic2.interpolateUsingSurfaceDistance(instrument.swath_width / 2.0);
+                        var E = Cesium.Cartesian3.fromDegrees(Cesium.Math.toDegrees(newCartographic2.longitude), Cesium.Math.toDegrees(newCartographic2.latitude))
+                    }
+
+                }
+
+                var footPrintCollection = new Cesium.EntityCollection();
+
+                var points;
+                if (satelliteName == "AEOLUS") {
+                    points = [A, B, C, D];
+
+                    footPrintCollection.add(drawPoint(points[0], 'A', Cesium.Color.RED));
+                    footPrintCollection.add(drawPoint(points[2], 'A', Cesium.Color.RED));
+                    footPrintCollection.add(drawPoint(points[3], 'A', Cesium.Color.RED));
+
+                    footPrintCollection.add(drawLine(points[0], points[3], 'b', false));
+                    footPrintCollection.add(drawLine(points[0], points[2], 'b', false));
+                } else {
+                    points = [A, B, C, D, E];
+                    // console.log(points)
+                    footPrintCollection.add(drawPoint(points[0], 'A', Cesium.Color.RED));
+                    footPrintCollection.add(drawPoint(points[3], 'A', Cesium.Color.RED));
+                    footPrintCollection.add(drawPoint(points[4], 'A', Cesium.Color.RED));
+
+                    footPrintCollection.add(drawLine(points[0], points[3], 'b', false));
+                    footPrintCollection.add(drawLine(points[0], points[4], 'b', false));
+                }
+
+                if (previousPointsOffNadirPoints[satelliteName]) {
+                    var polygon = drawOffNadirPolygon(previousPointsOffNadirPoints[satelliteName], points, satelliteName, true)
+                    footPrintCollection.add(polygon);
+                }
+                previousPointsOffNadirPoints[satelliteName] = points;
+                return footPrintCollection;
+            }
+
+
+            // const timeID = setInterval(timeAndDate, 1000);
+            satelliteNameIntervalIDMap = { 'CARTOSAT 3': 44804 }
+
+            function drawFootPrintInterval(satellite, instrumentName, riseTimeJulian, setTimeJulian) {
+                const satName = 'CARTOSAT 3'
+                previousPointsOffNadirPoints = {};
+
+                var footPrintCollectionArray = [];
+
+                var footprintParameters = getFootprintParameters(instrument);
+
+                if (satellite.getValue(clock.currentTime)) {
+                    var footPrintCollection = drawFootPrintMain2(satellite, instrument, clock.currentTime);
+                    footPrintCollectionArray.push(footPrintCollection);
+                    globalFootPrintCollectionArray.push(footPrintCollection);
+                }
+
+                // clears interval displaying previous interval when cycling through instruments
+                var currentIntervalID = satelliteNameIntervalIDMap[satName];
+                if (currentIntervalID) {
+                    clearInterval(currentIntervalID);
+                }
+
+                var intervalID = setInterval(function () {
+                    // remove excess instrument footprints from globe
+                    if (footPrintCollectionArray.length >= footprintParameters.numberOfFootPrintsAtAtime) {
+                        var entities = footPrintCollectionArray[0].values;
+                        footPrintCollectionArray.splice(0, 1);
+
+                        for (var i = 0; i < entities.length; i++) {
+                            viewer.entities.remove(entities[i]);
+                        }
+                    }
+
+                    if (satellite.getValue(clock.currentTime)) {
+                        var footPrintCollection = drawFootPrintMain2(satellite, instrument, clock.currentTime);
+                        footPrintCollectionArray.push(footPrintCollection);
+                        globalFootPrintCollectionArray.push(footPrintCollection);
+                    }
+                }, footprintParameters.intervalBetweenFootPrints);
+
+                satelliteNameIntervalIDMap[satName] = intervalID;
+                footPrintIntervalIDs.push(intervalID);
+
+                function drawFinalFootprint(clock) {
+                    if (clock.currentTime.equalsEpsilon(setTimeJulian, 2)) {
+                        var footPrintCollection = drawFootPrintMain2(satellite, instrument, clock.currentTime);
+                        footPrintCollectionArray.push(footPrintCollection);
+                        globalFootPrintCollectionArray.push(footPrintCollection);
+
+                        clearInterval(intervalID)
+                        viewer.clock.onTick.removeEventListener(drawFinalFootprint);
+                    }
+                }
+
+                viewer.clock.onTick.addEventListener(drawFinalFootprint);
+            }
+
+            function drawFootPrintMain2(satellite, instrument, timestamp) {
+                var colour = Cesium.color;
+                var satColour = new Cesium.Color(255, 0, 0, 0.3);
+
+                var cartesian = satellite.getValue(clock.currentTime);
+                var cartographic = Cesium.Cartographic.fromCartesian(cartesian);
+
+                var footPrintCollection = new Cesium.EntityCollection();
+
+                if (instrument.off_nadir_angle) {
+
+                    footPrintCollection = drawOffNadirFootprint(satellite, instrument, timestamp)
+                } else {
+                    var entity = drawInstrumentFootPrintSwathWidth(cartographic, instrument, satColour);
+                    footPrintCollection.add(entity);
+                }
+
+                return footPrintCollection;
+            }
+
+            function getFootprintParameters(instrument) {
+
+                var secondMultiplier = instrument.swath_width / 4000;  // for every 250km of swath width, add one second between footprints
+                // var intervalBetweenFootPrints = 1000.0 * secondMultiplier;
+                var intervalBetweenFootPrints = 1000.0
+                if (intervalBetweenFootPrints > 4000) {
+                    intervalBetweenFootPrints = 4000;
+                } else if (intervalBetweenFootPrints < 500) {
+                    intervalBetweenFootPrints = 1000;
+                }
+                var numberOfFootPrintsAtAtime = parseInt(30 / Math.ceil(2));
+
+                return { 'numberOfFootPrintsAtAtime': numberOfFootPrintsAtAtime, 'intervalBetweenFootPrints': intervalBetweenFootPrints };
+            }
+
+
+            // draws footprint of satellite based on its swath width of its instrument along the ground
+            function drawInstrumentFootPrintSwathWidth(cartographic, instrument, satColour) {
+
+                var longitude = Cesium.Math.toDegrees(cartographic.longitude)
+                var latitude = Cesium.Math.toDegrees(cartographic.latitude)
+                var height = cartographic.height;
+
+                // centre of the cone should be half the height of satellite, which puts apex at the satellites position
+                var position = Cesium.Cartesian3.fromDegrees(longitude, latitude, height / 2);
+
+                var cone = viewer.entities.add({
+                    name: 'Satellite Field of View',
+                    position: position,
+                    cylinder: {
+                        length: height,
+                        topRadius: 0.0,
+                        bottomRadius: instrument.swath_width / 2.0,
+                        material: satColour,
+                        outline: true,
+                        outlineColor: Cesium.Color.RED.withAlpha(0.5)
+                    }
+                });
+                return cone;
+            }
+
+            drawFootPrintInterval(positionsOverTime, instrument, start, stop);
+            loadModel();
+
+            // function timeAndDate(){
+            //   drawOffNadirFootprint(positionsOverTime, instrument, clock.currentTime);
+            //   console.log(globalFootPrintCollectionArray)
+            // }
+            // const st = setInterval( timeAndDate, 1000)
+
+        }
+        main();
+
+    </script>
+    </div>
+</body>
+<style>
+    /* #cesiumContainer {
+           
+    } */
+
+    body {
+        background-color: black;
+        padding: 0px;
+        margin: 0px;
+    }
+
+    body::-webkit-scrollbar {
+        display: none;
+        /* Webkit browsers (Chrome, Safari, Opera) */
+    }
+</style>

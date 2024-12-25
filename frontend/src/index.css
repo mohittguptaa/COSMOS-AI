@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base{
+    html{
+        font-family: 'roboto', sans-serif;
+    }
+}  
+
+@font-face {
+    font-family: 'Digital-7';
+    src: url('./assets/fonts/digital-7.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+  }

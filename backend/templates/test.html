@@ -1,0 +1,3992 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <!-- Include the CesiumJS JavaScript and CSS files -->
+    <script src="https://cesium.com/downloads/cesiumjs/releases/1.107.1/Build/Cesium/Cesium.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/satellite.js/4.0.0/satellite.min.js"></script>
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"></script>
+    <link rel="shortcut icon" href="#">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+
+    <link href="https://cesium.com/downloads/cesiumjs/releases/1.107.1/Build/Cesium/Widgets/widgets.css"
+        rel="stylesheet">
+
+</head>
+
+<body class="h-700px">
+
+    <div style="background: #e3f2fd; ">
+        <div class="main-block">
+            <div id="cesiumContainer"></div>
+            <table class="t1" style="border: 1px solid green;margin: 15px;">
+                <tr>
+                    <td style="font-weight: bold;">NORAD ID:</td>
+                    <td>44804</td>
+                </tr>
+                <tr>
+                    <td style="font-weight: bold;">UTC:</td>
+                    <td id="utc">--</td>
+                </tr>
+                <tr>
+                    <td style="font-weight: bold;">LATITUDE:</td>
+                    <td id="lat">--</td>
+                </tr>
+                <tr>
+                    <td style="font-weight: bold;">LONGITUDE</td>
+                    <td id="lon">--</td>
+                </tr>
+                <tr>
+                    <td style="font-weight: bold;">ALTITUDE [km]:</td>
+                    <td id="h">--</td>
+                </tr>
+                <tr>
+                    <td style="font-weight: bold;">SPEED [km/s]:</td>
+                    <td id="speed">--</td>
+                </tr>
+                <tr>
+                    <td style="font-weight: bold;">AZIMUTH:</td>
+                    <td id="az">--</td>
+                </tr>
+                <tr>
+                    <td style="font-weight: bold;">ELEVATION:</td>
+                    <td id="ele">--</td>
+                </tr>
+                <tr>
+                    <td style="font-weight: bold;">RIGHT ASCENSION:</td>
+                    <td id="ra">--</td>
+                </tr>
+                <tr>
+                    <td style="font-weight: bold;">DECLINATION:</td>
+                    <td id="dec">--</td>
+                </tr>
+            </table>
+        </div>
+
+        <div style="display: flex;gap: 10px;">
+            <select id="select_box" class="select-box">
+                <!-- {% for tle_value in tle_list %} -->
+                <option value="{{tle_value.id}}">43</option>
+                <!-- {% endfor %} -->
+            </select>
+            <!-- <div class="show-footprint">Show Footprint</div> -->
+        </div>
+        <div style="display: flex;justify-content: space-between;">
+            <div>
+                <p style="font-weight: bold;">Difference between Latest tle and prev. tle</p>
+                <ul>
+                    <li>Latitue Difference : <span id="LAT"></span></li>
+                    <li>Longitude Difference : <span id="LON"></span></li>
+                    <li>Altitude Difference : <span id="ALT"></span></li>
+                </ul>
+            </div>
+            <div style="background-color:#fff;padding: 10px;margin-right: 10px;">
+                <h3 style="font-size: 18px;">Your current location</h3>
+                <div style="font-size: 20px;">Latitude : <span>26.91667°</span></div>
+                <div style="font-size: 20px;">Longitude : <span>75.81667°</span></div>
+            </div>
+        </div>
+    </div>
+
+
+    <script type="module">
+
+        // convert radians to degrees
+        function r2d(radians, n) {
+            const num = radians * (180 / Math.PI);
+            return Math.round(num * Math.pow(10, n)) / Math.pow(10, n)
+        }
+
+        // fetch live data from server
+        function get_live_data() {
+            console.log(cur_loc.lat)
+            const div_data_lat = document.getElementById('lat');
+            const div_data_lon = document.getElementById('lon');
+            const div_data_height = document.getElementById('h');
+            const div_data_time = document.getElementById('utc');
+            const div_data_azimuth = document.getElementById('az');
+            const div_data_elevation = document.getElementById('ele');
+            const div_data_ra = document.getElementById('ra');
+            const div_data_dec = document.getElementById('dec');
+            const div_data_speed = document.getElementById('speed');
+
+            const li_data_lat = document.getElementById('LAT');
+            const li_data_lon = document.getElementById('LON');
+            const li_data_height = document.getElementById('ALT');
+
+            //   const tle_compare_id = document.getElementById('select_box').value;
+            const tle_compare_id = 6;
+            console.log(tle_compare_id)
+
+            var ps = viewer.entities.add({
+                position: new Cesium.Cartesian3.fromDegrees(cur_loc.lon, cur_loc.lat),
+                point: {
+                    pixelSize: 6,
+                    color: Cesium.Color.RED,
+                }
+            });
+            // var passed_data = { "cur_loc_lat": cur_loc.lat, "cur_loc_lon": cur_loc.lon, }
+            var passed_data = {
+                "cur_loc_lat": 24.598284,
+                "cur_loc_lon": 73.7242486,
+                "compare_tle": "6"
+            }
+            if (tle_compare_id) {
+                passed_data['compare_tle'] = tle_compare_id
+            };
+
+            // $.ajax({
+            //     url: "{% url 'data' satellite.norad_id %}",
+            //     type: "GET",
+            //     dataType: "json",
+            //     data: passed_data,
+
+            // success: (data) => {
+            // },
+            // error: (error) => {
+            //     console.log(error);
+            // }
+            var data = {
+                "context": {
+                    "lat": -4.09,
+                    "lon": 26,
+                    "height": 518.03,
+                    "speed": 7.6,
+                    "time": "7: 44: 49",
+                    "elevation": "-22deg 54' 54.5\"",
+                    "azimuth": "245deg 10' 18.1\"",
+                    "distance": 6088.394475035293,
+                    "ra": "10h 25m 17.12s",
+                    "dec": "-30deg 47' 14.0\""
+                },
+                "difference": {
+                    "lat": 5.71,
+                    "lon": 0.75,
+                    "height": 0.5900000000000318
+                }
+            }
+            div_data_lat.innerHTML = `${data.context.lat}`;
+            div_data_lon.innerHTML = `${data.context.lon}`;
+            div_data_height.innerHTML = `${data.context.height}`;
+            div_data_time.innerHTML = `${data.context.time}`;
+            div_data_azimuth.innerHTML = `${data.context.azimuth}`;
+            div_data_elevation.innerHTML = `${data.context.elevation}`;
+            div_data_ra.innerHTML = `${data.context.ra}`;
+            div_data_dec.innerHTML = `${data.context.dec}`;
+            div_data_speed.innerHTML = `${data.context.speed}`;
+
+            li_data_lat.innerHTML = `${(data.difference.lat).toFixed(4)}°`;
+            li_data_lon.innerHTML = `${(data.difference.lon).toFixed(4)}°`;
+            li_data_height.innerHTML = `${(data.difference.height).toFixed(4)} km`;
+            // console.log(data.context);
+
+            // });
+
+
+
+
+
+
+
+
+
+        }
+
+
+        // fetch data over timeline
+        function get_data_buffer() {
+            let data_readings;
+
+            // $.ajax({
+            //     url: "{% url 'databuffer' satellite.norad_id %}",
+            //     type: "GET",
+
+            //     dataType: "json",
+            //     async: false,
+            //     success: (data) => {
+            //         data_readings = data.context;
+            //     },
+            //     error: (error) => {
+            //         console.log(error);
+            //     }
+            // });
+
+            data_readings = {
+                "0": {
+                    "latitude": -12.528974354292634,
+                    "longitude": 23.92795138496274,
+                    "height": 519.4288042741665,
+                    "iso_string": "2024-11-30T07:48:35Z"
+                },
+                "1": {
+                    "latitude": -20.0743006346137,
+                    "longitude": 22.351061833365307,
+                    "height": 520.506811102558,
+                    "iso_string": "2024-11-30T07:50:35Z"
+                },
+                "2": {
+                    "latitude": -27.60486059503774,
+                    "longitude": 20.665942373901753,
+                    "height": 521.9341440155283,
+                    "iso_string": "2024-11-30T07:52:35Z"
+                },
+                "3": {
+                    "latitude": -35.11436756538081,
+                    "longitude": 18.806841329343413,
+                    "height": 523.5933749195816,
+                    "iso_string": "2024-11-30T07:54:35Z"
+                },
+                "4": {
+                    "latitude": -42.594938418241895,
+                    "longitude": 16.67304142869541,
+                    "height": 525.344945576062,
+                    "iso_string": "2024-11-30T07:56:35Z"
+                },
+                "5": {
+                    "latitude": -50.034922335668284,
+                    "longitude": 14.095256847653198,
+                    "height": 527.0375201435635,
+                    "iso_string": "2024-11-30T07:58:35Z"
+                },
+                "6": {
+                    "latitude": -57.41368257683599,
+                    "longitude": 10.758667314561478,
+                    "height": 528.5191145697243,
+                    "iso_string": "2024-11-30T08:00:35Z"
+                },
+                "7": {
+                    "latitude": -64.68745057166039,
+                    "longitude": 6.000384150188973,
+                    "height": 529.6481928161877,
+                    "iso_string": "2024-11-30T08:02:35Z"
+                },
+                "8": {
+                    "latitude": -71.74293425561547,
+                    "longitude": -1.8261288263464466,
+                    "height": 530.3039702438251,
+                    "iso_string": "2024-11-30T08:04:35Z"
+                },
+                "9": {
+                    "latitude": -78.19771069007095,
+                    "longitude": -17.776316428793045,
+                    "height": 530.395261407626,
+                    "iso_string": "2024-11-30T08:06:35Z"
+                },
+                "10": {
+                    "latitude": -82.3559582861516,
+                    "longitude": -57.12498873574106,
+                    "height": 529.8673344847377,
+                    "iso_string": "2024-11-30T08:08:35Z"
+                },
+                "11": {
+                    "latitude": -80.47665703792089,
+                    "longitude": -108.48410615040602,
+                    "height": 528.7063722702748,
+                    "iso_string": "2024-11-30T08:10:35Z"
+                },
+                "12": {
+                    "latitude": -74.63016599636157,
+                    "longitude": -131.90661121060717,
+                    "height": 526.9412804936948,
+                    "iso_string": "2024-11-30T08:12:35Z"
+                },
+                "13": {
+                    "latitude": -67.74298831801954,
+                    "longitude": -142.2123830517668,
+                    "height": 524.6427246294206,
+                    "iso_string": "2024-11-30T08:14:35Z"
+                },
+                "14": {
+                    "latitude": -60.52788978227961,
+                    "longitude": -147.98385242938173,
+                    "height": 521.919417633241,
+                    "iso_string": "2024-11-30T08:16:35Z"
+                },
+                "15": {
+                    "latitude": -53.16910944827116,
+                    "longitude": -151.8172688061302,
+                    "height": 518.9118264454153,
+                    "iso_string": "2024-11-30T08:18:35Z"
+                },
+                "16": {
+                    "latitude": -45.73104534432296,
+                    "longitude": -154.67041637757714,
+                    "height": 515.7836167769514,
+                    "iso_string": "2024-11-30T08:20:35Z"
+                },
+                "17": {
+                    "latitude": -38.241929004665195,
+                    "longitude": -156.96960388591384,
+                    "height": 512.7113114363542,
+                    "iso_string": "2024-11-30T08:22:35Z"
+                },
+                "18": {
+                    "latitude": -30.71675035801213,
+                    "longitude": -158.93300405646275,
+                    "height": 509.87278855603296,
+                    "iso_string": "2024-11-30T08:24:35Z"
+                },
+                "19": {
+                    "latitude": -23.16511953944215,
+                    "longitude": -160.6851618907995,
+                    "height": 507.4353768505906,
+                    "iso_string": "2024-11-30T08:26:35Z"
+                },
+                "20": {
+                    "latitude": -15.594392116047922,
+                    "longitude": -162.30427002947985,
+                    "height": 505.54439455357175,
+                    "iso_string": "2024-11-30T08:28:35Z"
+                },
+                "21": {
+                    "latitude": -8.011014223517565,
+                    "longitude": -163.84428399423237,
+                    "height": 504.3130048230978,
+                    "iso_string": "2024-11-30T08:30:35Z"
+                },
+                "22": {
+                    "latitude": -0.4211054752017637,
+                    "longitude": -165.34656233780376,
+                    "height": 503.81420559860965,
+                    "iso_string": "2024-11-30T08:32:35Z"
+                },
+                "23": {
+                    "latitude": 7.169306297248173,
+                    "longitude": -166.8469291240181,
+                    "height": 504.0756290125363,
+                    "iso_string": "2024-11-30T08:34:35Z"
+                },
+                "24": {
+                    "latitude": 14.754193124844052,
+                    "longitude": -168.38093739316997,
+                    "height": 505.07760208499474,
+                    "iso_string": "2024-11-30T08:36:35Z"
+                },
+                "25": {
+                    "latitude": 22.327442006299908,
+                    "longitude": -169.9890482651945,
+                    "height": 506.75463958023494,
+                    "iso_string": "2024-11-30T08:38:35Z"
+                },
+                "26": {
+                    "latitude": 29.88264426139841,
+                    "longitude": -171.72339314109325,
+                    "height": 509.0002365487866,
+                    "iso_string": "2024-11-30T08:40:35Z"
+                },
+                "27": {
+                    "latitude": 37.412565857095736,
+                    "longitude": -173.6587131818815,
+                    "height": 511.6745420463637,
+                    "iso_string": "2024-11-30T08:42:35Z"
+                },
+                "28": {
+                    "latitude": 44.90791901307857,
+                    "longitude": -175.91286316908818,
+                    "height": 514.6142628946008,
+                    "iso_string": "2024-11-30T08:44:35Z"
+                },
+                "29": {
+                    "latitude": 52.354519369890134,
+                    "longitude": -178.6900909774017,
+                    "height": 517.6439920462698,
+                    "iso_string": "2024-11-30T08:46:35Z"
+                },
+                "30": {
+                    "latitude": 59.72621705963421,
+                    "longitude": 177.61564791867025,
+                    "height": 520.5880898262243,
+                    "iso_string": "2024-11-30T08:48:35Z"
+                },
+                "31": {
+                    "latitude": 66.96467800063017,
+                    "longitude": 172.1342915121626,
+                    "height": 523.2822627114227,
+                    "iso_string": "2024-11-30T08:50:35Z"
+                },
+                "32": {
+                    "latitude": 73.9076489557621,
+                    "longitude": 162.56060998378211,
+                    "height": 525.5840668986896,
+                    "iso_string": "2024-11-30T08:52:35Z"
+                },
+                "33": {
+                    "latitude": 79.9489462564356,
+                    "longitude": 141.37681258365558,
+                    "height": 527.381690860363,
+                    "iso_string": "2024-11-30T08:54:35Z"
+                },
+                "34": {
+                    "latitude": 82.48594972760421,
+                    "longitude": 92.44298765276756,
+                    "height": 528.6005210760311,
+                    "iso_string": "2024-11-30T08:56:35Z"
+                },
+                "35": {
+                    "latitude": 78.81489301484075,
+                    "longitude": 49.64415218721991,
+                    "height": 529.207151648093,
+                    "iso_string": "2024-11-30T08:58:35Z"
+                },
+                "36": {
+                    "latitude": 72.47922289428338,
+                    "longitude": 32.14306740625803,
+                    "height": 529.210651931088,
+                    "iso_string": "2024-11-30T09:00:35Z"
+                },
+                "37": {
+                    "latitude": 65.45887175955508,
+                    "longitude": 23.78983376195935,
+                    "height": 528.6610536415646,
+                    "iso_string": "2024-11-30T09:02:35Z"
+                },
+                "38": {
+                    "latitude": 58.1988225041602,
+                    "longitude": 18.808669230699632,
+                    "height": 527.6451618040402,
+                    "iso_string": "2024-11-30T09:04:35Z"
+                },
+                "39": {
+                    "latitude": 50.8264961449537,
+                    "longitude": 15.360292015382836,
+                    "height": 526.2799355275033,
+                    "iso_string": "2024-11-30T09:06:35Z"
+                },
+                "40": {
+                    "latitude": 43.38993951638616,
+                    "longitude": 12.719735905067768,
+                    "height": 524.7038264574358,
+                    "iso_string": "2024-11-30T09:08:35Z"
+                },
+                "41": {
+                    "latitude": 35.91137626045428,
+                    "longitude": 10.548034655976114,
+                    "height": 523.0666017673473,
+                    "iso_string": "2024-11-30T09:10:35Z"
+                },
+                "42": {
+                    "latitude": 28.403123189905504,
+                    "longitude": 8.665105533625962,
+                    "height": 521.5183056575386,
+                    "iso_string": "2024-11-30T09:12:35Z"
+                },
+                "43": {
+                    "latitude": 20.873361397535916,
+                    "longitude": 6.9649074826639685,
+                    "height": 520.1981136458176,
+                    "iso_string": "2024-11-30T09:14:35Z"
+                },
+                "44": {
+                    "latitude": 13.328513066927286,
+                    "longitude": 5.378904665364139,
+                    "height": 519.2238891000101,
+                    "iso_string": "2024-11-30T09:16:35Z"
+                },
+                "45": {
+                    "latitude": 5.774283423874904,
+                    "longitude": 3.8583331836466144,
+                    "height": 518.6832437382178,
+                    "iso_string": "2024-11-30T09:18:35Z"
+                },
+                "46": {
+                    "latitude": -1.7838849163891515,
+                    "longitude": 2.3644905301237342,
+                    "height": 518.6268212008462,
+                    "iso_string": "2024-11-30T09:20:35Z"
+                },
+                "47": {
+                    "latitude": -9.340624523107419,
+                    "longitude": 0.8625195930025211,
+                    "height": 519.0643636771038,
+                    "iso_string": "2024-11-30T09:22:35Z"
+                },
+                "48": {
+                    "latitude": -16.89055198718875,
+                    "longitude": -0.6835882587594179,
+                    "height": 519.9638974084011,
+                    "iso_string": "2024-11-30T09:24:35Z"
+                },
+                "49": {
+                    "latitude": -24.42814802901196,
+                    "longitude": -2.3163478015376326,
+                    "height": 521.2541076303806,
+                    "iso_string": "2024-11-30T09:26:35Z"
+                },
+                "50": {
+                    "latitude": -31.947470932557728,
+                    "longitude": -4.092268733174708,
+                    "height": 522.8296994968837,
+                    "iso_string": "2024-11-30T09:28:35Z"
+                },
+                "51": {
+                    "latitude": -39.44148116592494,
+                    "longitude": -6.094534125495164,
+                    "height": 524.5592929306669,
+                    "iso_string": "2024-11-30T09:30:35Z"
+                },
+                "52": {
+                    "latitude": -46.90051071286302,
+                    "longitude": -8.457552765138786,
+                    "height": 526.2952050501486,
+                    "iso_string": "2024-11-30T09:32:35Z"
+                },
+                "53": {
+                    "latitude": -54.308698215907924,
+                    "longitude": -11.42038600860035,
+                    "height": 527.8843518838415,
+                    "iso_string": "2024-11-30T09:34:35Z"
+                },
+                "54": {
+                    "latitude": -61.63487660066796,
+                    "longitude": -15.458844859288488,
+                    "height": 529.1794563398429,
+                    "iso_string": "2024-11-30T09:36:35Z"
+                },
+                "55": {
+                    "latitude": -68.80525455783712,
+                    "longitude": -21.668358636129405,
+                    "height": 530.0497745797669,
+                    "iso_string": "2024-11-30T09:38:35Z"
+                },
+                "56": {
+                    "latitude": -75.59958526566302,
+                    "longitude": -33.11504215518935,
+                    "height": 530.3906325319899,
+                    "iso_string": "2024-11-30T09:40:35Z"
+                },
+                "57": {
+                    "latitude": -81.1251201375999,
+                    "longitude": -60.026950984332295,
+                    "height": 530.1311795764541,
+                    "iso_string": "2024-11-30T09:42:35Z"
+                },
+                "58": {
+                    "latitude": -82.04536154503569,
+                    "longitude": -113.59823177930714,
+                    "height": 529.2399003479784,
+                    "iso_string": "2024-11-30T09:44:35Z"
+                },
+                "59": {
+                    "latitude": -77.31220848804354,
+                    "longitude": -148.2748224533036,
+                    "height": 527.727565929696,
+                    "iso_string": "2024-11-30T09:46:35Z"
+                },
+                "60": {
+                    "latitude": -70.70931408703835,
+                    "longitude": -162.39704988259922,
+                    "height": 525.6474464192813,
+                    "iso_string": "2024-11-30T09:48:35Z"
+                },
+                "61": {
+                    "latitude": -63.59639689564224,
+                    "longitude": -169.5854554289768,
+                    "height": 523.092747442646,
+                    "iso_string": "2024-11-30T09:50:35Z"
+                },
+                "62": {
+                    "latitude": -56.28664465447992,
+                    "longitude": -174.06672882986973,
+                    "height": 520.1913764748053,
+                    "iso_string": "2024-11-30T09:52:35Z"
+                },
+                "63": {
+                    "latitude": -48.877300390564976,
+                    "longitude": -177.2622639833837,
+                    "height": 517.0982938309078,
+                    "iso_string": "2024-11-30T09:54:35Z"
+                },
+                "64": {
+                    "latitude": -41.407388711585284,
+                    "longitude": -179.76041977724998,
+                    "height": 513.9858578677085,
+                    "iso_string": "2024-11-30T09:56:35Z"
+                },
+                "65": {
+                    "latitude": -33.89604728997778,
+                    "longitude": 178.1535671020787,
+                    "height": 511.0327284987604,
+                    "iso_string": "2024-11-30T09:58:35Z"
+                },
+                "66": {
+                    "latitude": -26.35460686513936,
+                    "longitude": 176.32380404501046,
+                    "height": 508.41203475894855,
+                    "iso_string": "2024-11-30T10:00:35Z"
+                },
+                "67": {
+                    "latitude": -18.79114166111067,
+                    "longitude": 174.65619243179046,
+                    "height": 506.2796217718331,
+                    "iso_string": "2024-11-30T10:02:35Z"
+                },
+                "68": {
+                    "latitude": -11.21237915845184,
+                    "longitude": 173.08838334990153,
+                    "height": 504.76324784722965,
+                    "iso_string": "2024-11-30T10:04:35Z"
+                },
+                "69": {
+                    "latitude": -3.6245332767648937,
+                    "longitude": 171.57474463319713,
+                    "height": 503.95358332987365,
+                    "iso_string": "2024-11-30T10:06:35Z"
+                },
+                "70": {
+                    "latitude": 3.9663464114993037,
+                    "longitude": 170.07781797831018,
+                    "height": 503.8977570522684,
+                    "iso_string": "2024-11-30T10:08:35Z"
+                },
+                "71": {
+                    "latitude": 11.554241165572536,
+                    "longitude": 168.5625384961576,
+                    "height": 504.5960048727466,
+                    "iso_string": "2024-11-30T10:10:35Z"
+                },
+                "72": {
+                    "latitude": 19.133090321469297,
+                    "longitude": 166.99120707704563,
+                    "height": 506.00171449206397,
+                    "iso_string": "2024-11-30T10:12:35Z"
+                },
+                "73": {
+                    "latitude": 26.696651978158787,
+                    "longitude": 165.31763233859198,
+                    "height": 508.0248621572204,
+                    "iso_string": "2024-11-30T10:14:35Z"
+                },
+                "74": {
+                    "latitude": 34.23813918849579,
+                    "longitude": 163.47838733272167,
+                    "height": 510.53853876869573,
+                    "iso_string": "2024-11-30T10:16:35Z"
+                },
+                "75": {
+                    "latitude": 41.74935438520589,
+                    "longitude": 161.37731981211311,
+                    "height": 513.3880039938554,
+                    "iso_string": "2024-11-30T10:18:35Z"
+                },
+                "76": {
+                    "latitude": 49.218703846078775,
+                    "longitude": 158.8544227022866,
+                    "height": 516.4015175971258,
+                    "iso_string": "2024-11-30T10:20:35Z"
+                },
+                "77": {
+                    "latitude": 56.62644799133174,
+                    "longitude": 155.61543266239462,
+                    "height": 519.4020936521575,
+                    "iso_string": "2024-11-30T10:22:35Z"
+                },
+                "78": {
+                    "latitude": 63.932003796109846,
+                    "longitude": 151.0494082205842,
+                    "height": 522.2193063135485,
+                    "iso_string": "2024-11-30T10:24:35Z"
+                },
+                "79": {
+                    "latitude": 71.03322716672369,
+                    "longitude": 143.66731724559025,
+                    "height": 524.7003329736517,
+                    "iso_string": "2024-11-30T10:26:35Z"
+                },
+                "80": {
+                    "latitude": 77.59644161977562,
+                    "longitude": 128.9943915044235,
+                    "height": 526.719531587858,
+                    "iso_string": "2024-11-30T10:28:35Z"
+                },
+                "81": {
+                    "latitude": 82.16044265517608,
+                    "longitude": 92.83589397498407,
+                    "height": 528.1859915452319,
+                    "iso_string": "2024-11-30T10:30:35Z"
+                },
+                "82": {
+                    "latitude": 80.92672072888884,
+                    "longitude": 39.80369091539471,
+                    "height": 529.0486527675498,
+                    "iso_string": "2024-11-30T10:32:35Z"
+                },
+                "83": {
+                    "latitude": 75.28999054985452,
+                    "longitude": 14.067643060241673,
+                    "height": 529.2987431185528,
+                    "iso_string": "2024-11-30T10:34:35Z"
+                },
+                "84": {
+                    "latitude": 68.46490865546957,
+                    "longitude": 3.0089442592624707,
+                    "height": 528.9694340698086,
+                    "iso_string": "2024-11-30T10:36:35Z"
+                },
+                "85": {
+                    "latitude": 61.281801269891226,
+                    "longitude": -3.0525799013167636,
+                    "height": 528.1327589227545,
+                    "iso_string": "2024-11-30T10:38:35Z"
+                },
+                "86": {
+                    "latitude": 53.94844294552789,
+                    "longitude": -7.021954825383239,
+                    "height": 526.8939796768607,
+                    "iso_string": "2024-11-30T10:40:35Z"
+                },
+                "87": {
+                    "latitude": 46.53535948676661,
+                    "longitude": -9.947749553965119,
+                    "height": 525.3837304456033,
+                    "iso_string": "2024-11-30T10:42:35Z"
+                },
+                "88": {
+                    "latitude": 39.07263967867389,
+                    "longitude": -12.289027743435415,
+                    "height": 523.7484062881499,
+                    "iso_string": "2024-11-30T10:44:35Z"
+                },
+                "89": {
+                    "latitude": 31.57574132207961,
+                    "longitude": -14.277804970160163,
+                    "height": 522.1393999940525,
+                    "iso_string": "2024-11-30T10:46:35Z"
+                },
+                "90": {
+                    "latitude": 24.054177467673433,
+                    "longitude": -16.045157018885885,
+                    "height": 520.7019031410385,
+                    "iso_string": "2024-11-30T10:48:35Z"
+                },
+                "91": {
+                    "latitude": 16.51493378479804,
+                    "longitude": -17.672561797050864,
+                    "height": 519.5640643364261,
+                    "iso_string": "2024-11-30T10:50:35Z"
+                },
+                "92": {
+                    "latitude": 8.96393942352567,
+                    "longitude": -19.215625580225442,
+                    "height": 518.8273183490276,
+                    "iso_string": "2024-11-30T10:52:35Z"
+                },
+                "93": {
+                    "latitude": 1.4067152796699538,
+                    "longitude": -20.716404946639393,
+                    "height": 518.5586497708452,
+                    "iso_string": "2024-11-30T10:54:35Z"
+                },
+                "94": {
+                    "latitude": -6.151352033182527,
+                    "longitude": -22.210739874577186,
+                    "height": 518.7854274352895,
+                    "iso_string": "2024-11-30T10:56:35Z"
+                },
+                "95": {
+                    "latitude": -13.704894775637435,
+                    "longitude": -23.733555761342313,
+                    "height": 519.4932468652119,
+                    "iso_string": "2024-11-30T10:58:35Z"
+                },
+                "96": {
+                    "latitude": -21.24847118010839,
+                    "longitude": -25.323881218435336,
+                    "height": 520.6269665012248,
+                    "iso_string": "2024-11-30T11:00:35Z"
+                },
+                "97": {
+                    "latitude": -28.776369329743876,
+                    "longitude": -27.031169910093425,
+                    "height": 522.0948488608193,
+                    "iso_string": "2024-11-30T11:02:35Z"
+                },
+                "98": {
+                    "latitude": -36.282133089503525,
+                    "longitude": -28.925264675923906,
+                    "height": 523.7754544015451,
+                    "iso_string": "2024-11-30T11:04:35Z"
+                },
+                "99": {
+                    "latitude": -43.757477679558924,
+                    "longitude": -31.114707728258104,
+                    "height": 525.5267156511634,
+                    "iso_string": "2024-11-30T11:06:35Z"
+                },
+                "100": {
+                    "latitude": -51.18981352838621,
+                    "longitude": -33.784673136862104,
+                    "height": 527.1964652580745,
+                    "iso_string": "2024-11-30T11:08:35Z"
+                },
+                "101": {
+                    "latitude": -58.55620800123322,
+                    "longitude": -37.28558648946622,
+                    "height": 528.633614493485,
+                    "iso_string": "2024-11-30T11:10:35Z"
+                },
+                "102": {
+                    "latitude": -65.80660548239123,
+                    "longitude": -42.37216053822301,
+                    "height": 529.6991759090914,
+                    "iso_string": "2024-11-30T11:12:35Z"
+                },
+                "103": {
+                    "latitude": -72.806725155195,
+                    "longitude": -50.97721295865231,
+                    "height": 530.2763826960759,
+                    "iso_string": "2024-11-30T11:14:35Z"
+                },
+                "104": {
+                    "latitude": -79.08043844955992,
+                    "longitude": -69.22563317737966,
+                    "height": 530.2792598133341,
+                    "iso_string": "2024-11-30T11:16:35Z"
+                },
+                "105": {
+                    "latitude": -82.51564440511729,
+                    "longitude": -113.48737355005936,
+                    "height": 529.6591298740836,
+                    "iso_string": "2024-11-30T11:18:35Z"
+                },
+                "106": {
+                    "latitude": -79.70752880350761,
+                    "longitude": -161.16728070834202,
+                    "height": 528.408675544735,
+                    "iso_string": "2024-11-30T11:20:35Z"
+                },
+                "107": {
+                    "latitude": -73.5935054616812,
+                    "longitude": 178.54777096715438,
+                    "height": 526.5633211529045,
+                    "iso_string": "2024-11-30T11:22:35Z"
+                },
+                "108": {
+                    "latitude": -66.63153549981472,
+                    "longitude": 169.267643932442,
+                    "height": 524.1998366738775,
+                    "iso_string": "2024-11-30T11:24:35Z"
+                },
+                "109": {
+                    "latitude": -59.38671343892611,
+                    "longitude": 163.90403813833342,
+                    "height": 521.4322090171619,
+                    "iso_string": "2024-11-30T11:26:35Z"
+                },
+                "110": {
+                    "latitude": -52.01264889992721,
+                    "longitude": 160.26668449651513,
+                    "height": 518.4049719049445,
+                    "iso_string": "2024-11-30T11:28:35Z"
+                },
+                "111": {
+                    "latitude": -44.56521136735202,
+                    "longitude": 157.52062553344942,
+                    "height": 515.2843382499665,
+                    "iso_string": "2024-11-30T11:30:35Z"
+                },
+                "112": {
+                    "latitude": -37.06966401866029,
+                    "longitude": 155.28499378141078,
+                    "height": 512.2476346890456,
+                    "iso_string": "2024-11-30T11:32:35Z"
+                },
+                "113": {
+                    "latitude": -29.53981978304623,
+                    "longitude": 153.36121595904106,
+                    "height": 509.47168699630697,
+                    "iso_string": "2024-11-30T11:34:35Z"
+                },
+                "114": {
+                    "latitude": -21.984795348753533,
+                    "longitude": 151.63417600155736,
+                    "height": 507.12093080707535,
+                    "iso_string": "2024-11-30T11:36:35Z"
+                },
+                "115": {
+                    "latitude": -14.411741638904877,
+                    "longitude": 150.03054819714941,
+                    "height": 505.3361030060894,
+                    "iso_string": "2024-11-30T11:38:35Z"
+                },
+                "116": {
+                    "latitude": -6.82702624957523,
+                    "longitude": 148.4989474624698,
+                    "height": 504.22438348280923,
+                    "iso_string": "2024-11-30T11:40:35Z"
+                },
+                "117": {
+                    "latitude": 0.7632573238458922,
+                    "longitude": 146.99927480264247,
+                    "height": 503.8517884356356,
+                    "iso_string": "2024-11-30T11:42:35Z"
+                },
+                "118": {
+                    "latitude": 8.353087921189035,
+                    "longitude": 145.49607606479972,
+                    "height": 504.2384600038032,
+                    "iso_string": "2024-11-30T11:44:35Z"
+                },
+                "119": {
+                    "latitude": 15.936434069251382,
+                    "longitude": 143.95339364656544,
+                    "height": 505.35726277645443,
+                    "iso_string": "2024-11-30T11:46:35Z"
+                },
+                "120": {
+                    "latitude": 23.507158819489632,
+                    "longitude": 142.32946091596506,
+                    "height": 507.1358109025492,
+                    "iso_string": "2024-11-30T11:48:35Z"
+                },
+                "121": {
+                    "latitude": 31.05877470756566,
+                    "longitude": 140.56950089541928,
+                    "height": 509.4617463545689,
+                    "iso_string": "2024-11-30T11:50:35Z"
+                },
+                "122": {
+                    "latitude": 38.58383769908714,
+                    "longitude": 138.59376391297616,
+                    "height": 512.1908091731202,
+                    "iso_string": "2024-11-30T11:52:35Z"
+                },
+                "123": {
+                    "latitude": 46.07254974622885,
+                    "longitude": 136.274667269309,
+                    "height": 515.1570189771991,
+                    "iso_string": "2024-11-30T11:54:35Z"
+                },
+                "124": {
+                    "latitude": 53.509503459328606,
+                    "longitude": 133.38765365591928,
+                    "height": 518.1841463413455,
+                    "iso_string": "2024-11-30T11:56:35Z"
+                },
+                "125": {
+                    "latitude": 60.86544633733042,
+                    "longitude": 129.49138414509397,
+                    "height": 521.0976000200828,
+                    "iso_string": "2024-11-30T11:58:35Z"
+                },
+                "126": {
+                    "latitude": 68.07305009890855,
+                    "longitude": 123.58661086623712,
+                    "height": 523.735884038247,
+                    "iso_string": "2024-11-30T12:00:35Z"
+                },
+                "127": {
+                    "latitude": 74.93732203461992,
+                    "longitude": 112.93669230738209,
+                    "height": 525.9608696360269,
+                    "iso_string": "2024-11-30T12:02:35Z"
+                },
+                "128": {
+                    "latitude": 80.69243235295167,
+                    "longitude": 88.45314415415172,
+                    "height": 527.6662588613143,
+                    "iso_string": "2024-11-30T12:04:35Z"
+                },
+                "129": {
+                    "latitude": 82.27261909203058,
+                    "longitude": 36.219393809918,
+                    "height": 528.7837684438072,
+                    "iso_string": "2024-11-30T12:06:35Z"
+                },
+                "130": {
+                    "latitude": 77.91738381289093,
+                    "longitude": -1.6207124734116636,
+                    "height": 529.2867189755759,
+                    "iso_string": "2024-11-30T12:08:35Z"
+                },
+                "131": {
+                    "latitude": 71.41213467958957,
+                    "longitude": -16.948904378961927,
+                    "height": 529.190866847823,
+                    "iso_string": "2024-11-30T12:10:35Z"
+                },
+                "132": {
+                    "latitude": 64.33896009813674,
+                    "longitude": -24.559553276330572,
+                    "height": 528.5524627685022,
+                    "iso_string": "2024-11-30T12:12:35Z"
+                },
+                "133": {
+                    "latitude": 57.05624849476573,
+                    "longitude": -29.2245658003017,
+                    "height": 527.4636631142257,
+                    "iso_string": "2024-11-30T12:14:35Z"
+                },
+                "134": {
+                    "latitude": 49.67174617019345,
+                    "longitude": -32.51366257911943,
+                    "height": 526.0455620015857,
+                    "iso_string": "2024-11-30T12:16:35Z"
+                },
+                "135": {
+                    "latitude": 42.227539435448435,
+                    "longitude": -35.064488419364984,
+                    "height": 524.4392537183538,
+                    "iso_string": "2024-11-30T12:18:35Z"
+                },
+                "136": {
+                    "latitude": 34.74366152652622,
+                    "longitude": -37.181888684444665,
+                    "height": 522.7954731150725,
+                    "iso_string": "2024-11-30T12:20:35Z"
+                },
+                "137": {
+                    "latitude": 27.23153227374789,
+                    "longitude": -39.030636035621484,
+                    "height": 521.2634856662488,
+                    "iso_string": "2024-11-30T12:22:35Z"
+                },
+                "138": {
+                    "latitude": 19.698950713191195,
+                    "longitude": -40.709203681488795,
+                    "height": 519.9799935432346,
+                    "iso_string": "2024-11-30T12:24:35Z"
+                },
+                "139": {
+                    "latitude": 12.152180280860707,
+                    "longitude": -42.282164557380504,
+                    "height": 519.0588706063569,
+                    "iso_string": "2024-11-30T12:26:35Z"
+                },
+                "140": {
+                    "latitude": 4.596866334671225,
+                    "longitude": -43.79620223906623,
+                    "height": 518.5825205159042,
+                    "iso_string": "2024-11-30T12:28:35Z"
+                },
+                "141": {
+                    "latitude": -2.9615665106769944,
+                    "longitude": -45.289064061289686,
+                    "height": 518.5955574952866,
+                    "iso_string": "2024-11-30T12:30:35Z"
+                },
+                "142": {
+                    "latitude": -10.517751238897082,
+                    "longitude": -46.79546788509631,
+                    "height": 519.1013389669401,
+                    "iso_string": "2024-11-30T12:32:35Z"
+                },
+                "143": {
+                    "latitude": -18.066290765515127,
+                    "longitude": -48.352055982183714,
+                    "height": 520.0616468459917,
+                    "iso_string": "2024-11-30T12:34:35Z"
+                },
+                "144": {
+                    "latitude": -25.60162229473088,
+                    "longitude": -50.002949056800205,
+                    "height": 521.3995453152561,
+                    "iso_string": "2024-11-30T12:36:35Z"
+                },
+                "145": {
+                    "latitude": -33.117688366662854,
+                    "longitude": -51.80779006167772,
+                    "height": 523.0051705335424,
+                    "iso_string": "2024-11-30T12:38:35Z"
+                },
+                "146": {
+                    "latitude": -40.607168816527015,
+                    "longitude": -53.85568853065245,
+                    "height": 524.743965773706,
+                    "iso_string": "2024-11-30T12:40:35Z"
+                },
+                "147": {
+                    "latitude": -48.05974045302025,
+                    "longitude": -56.29272833540329,
+                    "height": 526.466691469356,
+                    "iso_string": "2024-11-30T12:42:35Z"
+                },
+                "148": {
+                    "latitude": -55.45798184421031,
+                    "longitude": -59.38295051637346,
+                    "height": 528.0204296529669,
+                    "iso_string": "2024-11-30T12:44:35Z"
+                },
+                "149": {
+                    "latitude": -62.766689885374085,
+                    "longitude": -63.66253649572625,
+                    "height": 529.2597691030957,
+                    "iso_string": "2024-11-30T12:46:35Z"
+                },
+                "150": {
+                    "latitude": -69.89982582443857,
+                    "longitude": -70.39962700317051,
+                    "height": 530.0573923307122,
+                    "iso_string": "2024-11-30T12:48:35Z"
+                },
+                "151": {
+                    "latitude": -76.58915352259227,
+                    "longitude": -83.26815330482331,
+                    "height": 530.3133719613365,
+                    "iso_string": "2024-11-30T12:50:35Z"
+                },
+                "152": {
+                    "latitude": -81.69957872859159,
+                    "longitude": -114.41370952331478,
+                    "height": 529.9626033686292,
+                    "iso_string": "2024-11-30T12:52:35Z"
+                },
+                "153": {
+                    "latitude": -81.56984750330165,
+                    "longitude": -168.665086489208,
+                    "height": 528.979936072654,
+                    "iso_string": "2024-11-30T12:54:35Z"
+                },
+                "154": {
+                    "latitude": -76.34493563034188,
+                    "longitude": 161.2700653466394,
+                    "height": 527.3827071400397,
+                    "iso_string": "2024-11-30T12:56:35Z"
+                },
+                "155": {
+                    "latitude": -69.61962668345951,
+                    "longitude": 148.77063428725293,
+                    "height": 525.2305205299988,
+                    "iso_string": "2024-11-30T12:58:35Z"
+                },
+                "156": {
+                    "latitude": -62.464413029595704,
+                    "longitude": 142.16837280154826,
+                    "height": 522.6222571940222,
+                    "iso_string": "2024-11-30T13:00:35Z"
+                },
+                "157": {
+                    "latitude": -55.134926656325256,
+                    "longitude": 137.94936731281572,
+                    "height": 519.6904448155619,
+                    "iso_string": "2024-11-30T13:02:35Z"
+                },
+                "158": {
+                    "latitude": -47.7142527467516,
+                    "longitude": 134.8904379288447,
+                    "height": 516.593266115689,
+                    "iso_string": "2024-11-30T13:04:35Z"
+                },
+                "159": {
+                    "latitude": -40.23687459289007,
+                    "longitude": 132.47092024941963,
+                    "height": 513.5046398565628,
+                    "iso_string": "2024-11-30T13:06:35Z"
+                },
+                "160": {
+                    "latitude": -32.72020847924041,
+                    "longitude": 130.43310801583272,
+                    "height": 510.6029621974991,
+                    "iso_string": "2024-11-30T13:08:35Z"
+                },
+                "161": {
+                    "latitude": -25.174874304446103,
+                    "longitude": 128.63381790406868,
+                    "height": 508.05923399563636,
+                    "iso_string": "2024-11-30T13:10:35Z"
+                },
+                "162": {
+                    "latitude": -17.608647730174127,
+                    "longitude": 126.98535021437186,
+                    "height": 506.02540216522283,
+                    "iso_string": "2024-11-30T13:12:35Z"
+                },
+                "163": {
+                    "latitude": -10.028136826730233,
+                    "longitude": 125.42872785528226,
+                    "height": 504.6237880326387,
+                    "iso_string": "2024-11-30T13:14:35Z"
+                },
+                "164": {
+                    "latitude": -2.4395129805534923,
+                    "longitude": 123.92005739395573,
+                    "height": 503.9384433921978,
+                    "iso_string": "2024-11-30T13:16:35Z"
+                },
+                "165": {
+                    "latitude": 5.1511868624583155,
+                    "longitude": 122.42259759236521,
+                    "height": 504.00915529667355,
+                    "iso_string": "2024-11-30T13:18:35Z"
+                },
+                "166": {
+                    "latitude": 12.737944907660214,
+                    "longitude": 120.90120714736739,
+                    "height": 504.82861696065305,
+                    "iso_string": "2024-11-30T13:20:35Z"
+                },
+                "167": {
+                    "latitude": 20.314687779401513,
+                    "longitude": 119.31729328546122,
+                    "height": 506.3430136107471,
+                    "iso_string": "2024-11-30T13:22:35Z"
+                },
+                "168": {
+                    "latitude": 27.87512417590022,
+                    "longitude": 117.62266477609042,
+                    "height": 508.4559710429737,
+                    "iso_string": "2024-11-30T13:24:35Z"
+                },
+                "169": {
+                    "latitude": 35.41232591195195,
+                    "longitude": 115.75006499120026,
+                    "height": 511.03552037763257,
+                    "iso_string": "2024-11-30T13:26:35Z"
+                },
+                "170": {
+                    "latitude": 42.91774235740992,
+                    "longitude": 113.59603429956199,
+                    "height": 513.92348289734,
+                    "iso_string": "2024-11-30T13:28:35Z"
+                },
+                "171": {
+                    "latitude": 50.37893601984273,
+                    "longitude": 110.985837912747,
+                    "height": 516.946502321393,
+                    "iso_string": "2024-11-30T13:30:35Z"
+                },
+                "172": {
+                    "latitude": 57.77409556770962,
+                    "longitude": 107.59258682385625,
+                    "height": 519.9278622669627,
+                    "iso_string": "2024-11-30T13:32:35Z"
+                },
+                "173": {
+                    "latitude": 65.0570191699923,
+                    "longitude": 102.72255459845755,
+                    "height": 522.6992223692368,
+                    "iso_string": "2024-11-30T13:34:35Z"
+                },
+                "174": {
+                    "latitude": 72.10721847155618,
+                    "longitude": 94.63398955869023,
+                    "height": 525.1114735311188,
+                    "iso_string": "2024-11-30T13:36:35Z"
+                },
+                "175": {
+                    "latitude": 78.51155617165557,
+                    "longitude": 77.91592373786042,
+                    "height": 527.0440300491022,
+                    "iso_string": "2024-11-30T13:38:35Z"
+                },
+                "176": {
+                    "latitude": 82.43272451254377,
+                    "longitude": 36.79142387324679,
+                    "height": 528.4120219699483,
+                    "iso_string": "2024-11-30T13:40:35Z"
+                },
+                "177": {
+                    "latitude": 80.21363438753745,
+                    "longitude": -13.408572867215238,
+                    "height": 529.1710069069978,
+                    "iso_string": "2024-11-30T13:42:35Z"
+                },
+                "178": {
+                    "latitude": 74.26847215962847,
+                    "longitude": -35.65291668418596,
+                    "height": 529.3189751842182,
+                    "iso_string": "2024-11-30T13:44:35Z"
+                },
+                "179": {
+                    "latitude": 67.36071578780505,
+                    "longitude": -45.5728829427867,
+                    "height": 528.8955709788718,
+                    "iso_string": "2024-11-30T13:46:35Z"
+                },
+                "180": {
+                    "latitude": 60.14622482751317,
+                    "longitude": -51.19176090101603,
+                    "height": 527.9785957923426,
+                    "iso_string": "2024-11-30T13:48:35Z"
+                },
+                "181": {
+                    "latitude": 52.79738178539082,
+                    "longitude": -54.95174847689541,
+                    "height": 526.6780022127932,
+                    "iso_string": "2024-11-30T13:50:35Z"
+                },
+                "182": {
+                    "latitude": 45.37512410624486,
+                    "longitude": -57.76437668697515,
+                    "height": 525.1277277824596,
+                    "iso_string": "2024-11-30T13:52:35Z"
+                },
+                "183": {
+                    "latitude": 37.90625484832248,
+                    "longitude": -60.03893191404231,
+                    "height": 523.4758592186528,
+                    "iso_string": "2024-11-30T13:54:35Z"
+                },
+                "184": {
+                    "latitude": 30.40493470893538,
+                    "longitude": -61.98624375295285,
+                    "height": 521.8737488431333,
+                    "iso_string": "2024-11-30T13:56:35Z"
+                },
+                "185": {
+                    "latitude": 22.880129099959817,
+                    "longitude": -63.72728807616392,
+                    "height": 520.4648143723884,
+                    "iso_string": "2024-11-30T13:58:35Z"
+                },
+                "186": {
+                    "latitude": 15.338591939349055,
+                    "longitude": -65.33835438229251,
+                    "height": 519.3738224217,
+                    "iso_string": "2024-11-30T14:00:35Z"
+                },
+                "187": {
+                    "latitude": 7.786160427571504,
+                    "longitude": -66.87230293078251,
+                    "height": 518.6974667706544,
+                    "iso_string": "2024-11-30T14:02:35Z"
+                },
+                "188": {
+                    "latitude": 0.22832424162496762,
+                    "longitude": -68.36981654523802,
+                    "height": 518.4969905565534,
+                    "iso_string": "2024-11-30T14:04:35Z"
+                },
+                "189": {
+                    "latitude": -7.329536300397119,
+                    "longitude": -69.86627002444328,
+                    "height": 518.7934623319904,
+                    "iso_string": "2024-11-30T14:06:35Z"
+                },
+                "190": {
+                    "latitude": -14.882046438803428,
+                    "longitude": -71.39688702543702,
+                    "height": 519.5661072136331,
+                    "iso_string": "2024-11-30T14:08:35Z"
+                },
+                "191": {
+                    "latitude": -22.423736768959547,
+                    "longitude": -73.00184990730075,
+                    "height": 520.7538370326826,
+                    "iso_string": "2024-11-30T14:10:35Z"
+                },
+                "192": {
+                    "latitude": -29.94881759645733,
+                    "longitude": -74.73300177792053,
+                    "height": 522.2598481588723,
+                    "iso_string": "2024-11-30T14:12:35Z"
+                },
+                "193": {
+                    "latitude": -37.45063801518602,
+                    "longitude": -76.66470810020876,
+                    "height": 523.9588969427213,
+                    "iso_string": "2024-11-30T14:14:35Z"
+                },
+                "194": {
+                    "latitude": -44.92045438346158,
+                    "longitude": -78.91421771694927,
+                    "height": 525.7066514764385,
+                    "iso_string": "2024-11-30T14:16:35Z"
+                },
+                "195": {
+                    "latitude": -52.34460140581371,
+                    "longitude": -81.68461272367564,
+                    "height": 527.3503759706522,
+                    "iso_string": "2024-11-30T14:18:35Z"
+                },
+                "196": {
+                    "latitude": -59.69748148866955,
+                    "longitude": -85.36721855649246,
+                    "height": 528.7401388934209,
+                    "iso_string": "2024-11-30T14:20:35Z"
+                },
+                "197": {
+                    "latitude": -66.92155838319422,
+                    "longitude": -90.82503741339968,
+                    "height": 529.7397438041363,
+                    "iso_string": "2024-11-30T14:22:35Z"
+                },
+                "198": {
+                    "latitude": -73.85655858064091,
+                    "longitude": -100.3399246431297,
+                    "height": 530.2366487337654,
+                    "iso_string": "2024-11-30T14:24:35Z"
+                },
+                "199": {
+                    "latitude": -79.90486828621717,
+                    "longitude": -121.34118887616292,
+                    "height": 530.150247651645,
+                    "iso_string": "2024-11-30T14:26:35Z"
+                },
+                "200": {
+                    "latitude": -82.49304652803053,
+                    "longitude": -170.02368868393674,
+                    "height": 529.4380180799059,
+                    "iso_string": "2024-11-30T14:28:35Z"
+                },
+                "201": {
+                    "latitude": -78.86638784852649,
+                    "longitude": 146.88747223112145,
+                    "height": 528.0991785291271,
+                    "iso_string": "2024-11-30T14:30:35Z"
+                },
+                "202": {
+                    "latitude": -72.53784704375835,
+                    "longitude": 129.23861534089698,
+                    "height": 526.1756404335925,
+                    "iso_string": "2024-11-30T14:32:35Z"
+                },
+                "203": {
+                    "latitude": -65.51240053676116,
+                    "longitude": 120.83435884833682,
+                    "height": 523.7501798336541,
+                    "iso_string": "2024-11-30T14:34:35Z"
+                },
+                "204": {
+                    "latitude": -58.24114697558651,
+                    "longitude": 115.83109696506719,
+                    "height": 520.941896379345,
+                    "iso_string": "2024-11-30T14:36:35Z"
+                },
+                "205": {
+                    "latitude": -50.85304839133408,
+                    "longitude": 112.37109625515492,
+                    "height": 517.8991745982488,
+                    "iso_string": "2024-11-30T14:38:35Z"
+                },
+                "206": {
+                    "latitude": -43.39681929423233,
+                    "longitude": 109.72342140837871,
+                    "height": 514.7905158433173,
+                    "iso_string": "2024-11-30T14:40:35Z"
+                },
+                "207": {
+                    "latitude": -35.89516716034663,
+                    "longitude": 107.54675212467902,
+                    "height": 511.7937648416006,
+                    "iso_string": "2024-11-30T14:42:35Z"
+                },
+                "208": {
+                    "latitude": -28.360877934954967,
+                    "longitude": 105.65991207282228,
+                    "height": 509.0844013728119,
+                    "iso_string": "2024-11-30T14:44:35Z"
+                },
+                "209": {
+                    "latitude": -20.802636561409685,
+                    "longitude": 103.95626863868506,
+                    "height": 506.8236877005977,
+                    "iso_string": "2024-11-30T14:46:35Z"
+                },
+                "210": {
+                    "latitude": -13.22741621071873,
+                    "longitude": 102.36690681927182,
+                    "height": 505.1475341520273,
+                    "iso_string": "2024-11-30T14:48:35Z"
+                },
+                "211": {
+                    "latitude": -5.641517428926394,
+                    "longitude": 100.84276454659546,
+                    "height": 504.156947374552,
+                    "iso_string": "2024-11-30T14:50:35Z"
+                },
+                "212": {
+                    "latitude": 1.948988034035117,
+                    "longitude": 99.34484661844029,
+                    "height": 503.9108434295304,
+                    "iso_string": "2024-11-30T14:52:35Z"
+                },
+                "213": {
+                    "latitude": 9.538084081693114,
+                    "longitude": 97.83794686574993,
+                    "height": 504.4218381995322,
+                    "iso_string": "2024-11-30T14:54:35Z"
+                },
+                "214": {
+                    "latitude": 17.119733799778945,
+                    "longitude": 96.28557667410021,
+                    "height": 505.65538313512087,
+                    "iso_string": "2024-11-30T14:56:35Z"
+                },
+                "215": {
+                    "latitude": 24.687770784347006,
+                    "longitude": 94.64449229689349,
+                    "height": 507.5323224772302,
+                    "iso_string": "2024-11-30T14:58:35Z"
+                },
+                "216": {
+                    "latitude": 32.23561477517798,
+                    "longitude": 92.85698788186893,
+                    "height": 509.93464610642314,
+                    "iso_string": "2024-11-30T15:00:35Z"
+                },
+                "217": {
+                    "latitude": 39.75557934889238,
+                    "longitude": 90.83776967242265,
+                    "height": 512.7139396269129,
+                    "iso_string": "2024-11-30T15:02:35Z"
+                },
+                "218": {
+                    "latitude": 47.23728151169169,
+                    "longitude": 88.44839353568511,
+                    "height": 515.7018234036763,
+                    "iso_string": "2024-11-30T15:04:35Z"
+                },
+                "219": {
+                    "latitude": 54.663905927963135,
+                    "longitude": 85.44129001968219,
+                    "height": 518.7215453843247,
+                    "iso_string": "2024-11-30T15:06:35Z"
+                },
+                "220": {
+                    "latitude": 62.002572897322715,
+                    "longitude": 81.32028632033406,
+                    "height": 521.5998533976385,
+                    "iso_string": "2024-11-30T15:08:35Z"
+                },
+                "221": {
+                    "latitude": 69.17513247116234,
+                    "longitude": 74.93225561149228,
+                    "height": 524.1783118564175,
+                    "iso_string": "2024-11-30T15:10:35Z"
+                },
+                "222": {
+                    "latitude": 75.94539850055972,
+                    "longitude": 63.00968406585394,
+                    "height": 526.3233265923218,
+                    "iso_string": "2024-11-30T15:12:35Z"
+                },
+                "223": {
+                    "latitude": 81.34107496523187,
+                    "longitude": 34.6556566845886,
+                    "height": 527.9342776856053,
+                    "iso_string": "2024-11-30T15:14:35Z"
+                },
+                "224": {
+                    "latitude": 81.89324603610294,
+                    "longitude": -19.374981891724424,
+                    "height": 528.9493134648485,
+                    "iso_string": "2024-11-30T15:16:35Z"
+                },
+                "225": {
+                    "latitude": 76.97504135534611,
+                    "longitude": -52.36427565191237,
+                    "height": 529.3485149039959,
+                    "iso_string": "2024-11-30T15:18:35Z"
+                },
+                "226": {
+                    "latitude": 70.3316826282492,
+                    "longitude": -65.87452130764036,
+                    "height": 529.1542910287371,
+                    "iso_string": "2024-11-30T15:20:35Z"
+                },
+                "227": {
+                    "latitude": 63.212995488869836,
+                    "longitude": -72.84331135132284,
+                    "height": 528.4290114189948,
+                    "iso_string": "2024-11-30T15:22:35Z"
+                },
+                "228": {
+                    "latitude": 55.90994565291286,
+                    "longitude": -77.22653567401206,
+                    "height": 527.2700239556431,
+                    "iso_string": "2024-11-30T15:24:35Z"
+                },
+                "229": {
+                    "latitude": 48.51419892876013,
+                    "longitude": -80.37070372403153,
+                    "height": 525.8023476216487,
+                    "iso_string": "2024-11-30T15:26:35Z"
+                },
+                "230": {
+                    "latitude": 41.06278852969232,
+                    "longitude": -82.83877548031815,
+                    "height": 524.1694717482761,
+                    "iso_string": "2024-11-30T15:28:35Z"
+                },
+                "231": {
+                    "latitude": 33.57384964076862,
+                    "longitude": -84.9056848676062,
+                    "height": 522.522829762425,
+                    "iso_string": "2024-11-30T15:30:35Z"
+                },
+                "232": {
+                    "latitude": 26.05801674842055,
+                    "longitude": -86.72254451191678,
+                    "height": 521.0106362274397,
+                    "iso_string": "2024-11-30T15:32:35Z"
+                },
+                "233": {
+                    "latitude": 18.522754313425693,
+                    "longitude": -88.38099610431733,
+                    "height": 519.7668644570224,
+                    "iso_string": "2024-11-30T15:34:35Z"
+                },
+                "234": {
+                    "latitude": 10.974188183205447,
+                    "longitude": -89.94201785793301,
+                    "height": 518.9011795100181,
+                    "iso_string": "2024-11-30T15:36:35Z"
+                },
+                "235": {
+                    "latitude": 3.4179130912812177,
+                    "longitude": -91.45042103937718,
+                    "height": 518.4906113938429,
+                    "iso_string": "2024-11-30T15:38:35Z"
+                },
+                "236": {
+                    "latitude": -4.1406605372047185,
+                    "longitude": -92.94313653272134,
+                    "height": 518.5736465692557,
+                    "iso_string": "2024-11-30T15:40:35Z"
+                },
+                "geodetic": [
+                    -149.58283825412644,
+                    -12.407881187929469,
+                    519409.8846655097,
+                    -149.84659753422912,
+                    -14.294990883313883,
+                    519638.6124732578,
+                    -150.1147771617666,
+                    -16.181445871263662,
+                    519893.69279247615,
+                    -150.38808033552598,
+                    -18.06715847303313,
+                    520173.8421867769,
+                    -150.6672593387383,
+                    -19.952039653339273,
+                    520477.6405077046,
+                    -150.95312435083449,
+                    -21.83599861803718,
+                    520803.5376135865,
+                    -151.24655351229643,
+                    -23.718942316312894,
+                    521149.86069578584,
+                    -151.5485045175025,
+                    -25.600774827793447,
+                    521514.82217384875,
+                    -151.86002807143234,
+                    -27.481396610929433,
+                    521896.5281187277,
+                    -152.18228362364485,
+                    -29.360703583614047,
+                    522292.98716067243,
+                    -152.51655789252794,
+                    -31.23858600029274,
+                    522702.11983662006,
+                    -152.86428682098415,
+                    -33.11492708087102,
+                    523121.7683300581,
+                    -153.22708177090527,
+                    -34.989601335299156,
+                    523549.7065550927,
+                    -153.60676098047628,
+                    -36.862472512517925,
+                    523983.65053524263,
+                    -154.00538759300628,
+                    -38.73339108255172,
+                    524421.2690268578,
+                    -154.4253159426817,
+                    -40.602191133867706,
+                    524860.1943365363,
+                    -154.86924828535595,
+                    -42.468686532480724,
+                    525298.033281737,
+                    -155.3403048387639,
+                    -44.332666140889,
+                    525732.3782438906,
+                    -155.84211091505048,
+                    -46.19388782863769,
+                    526160.8182637515,
+                    -156.37890618758996,
+                    -48.052070915021844,
+                    526580.9501292165,
+                    -156.95568287733224,
+                    -49.906886556218794,
+                    526990.3894067947,
+                    -157.57836208344142,
+                    -51.757945408565504,
+                    527386.7813688787,
+                    -158.25402093371042,
+                    -53.60478164032433,
+                    527767.8117703265,
+                    -158.99118816751482,
+                    -55.44683198833199,
+                    528131.2174290791,
+                    -159.8002329101367,
+                    -57.283408002136404,
+                    528474.7965672864,
+                    -160.69388186269703,
+                    -59.11365879042043,
+                    528796.4188710405,
+                    -161.68791563505476,
+                    -60.936520327684946,
+                    529094.0352285579,
+                    -162.80211816383002,
+                    -62.75064543796027,
+                    529365.6871086629,
+                    -164.06158823643207,
+                    -64.55430552300884,
+                    529609.5155433035,
+                    -165.4985754554757,
+                    -66.34525022738919,
+                    529823.7696799319,
+                    -167.15508395159918,
+                    -68.12050330483427,
+                    530006.8148716614,
+                    -169.08660851075226,
+                    -69.87605985785109,
+                    530157.1402751189,
+                    -171.36754244170982,
+                    -71.60642825270021,
+                    530273.3659283444,
+                    -174.09902175132228,
+                    -73.3039233808296,
+                    530354.2492828583,
+                    -177.42016898488777,
+                    -74.9575575642602,
+                    530398.6911664726,
+                    178.4764716211562,
+                    -76.55128176267836,
+                    530405.7411555583,
+                    173.3262456124119,
+                    -78.06121014544514,
+                    530374.6023374517,
+                    166.77817726391834,
+                    -79.45141356398713,
+                    530304.6354460157,
+                    158.41299511743568,
+                    -80.66832299869822,
+                    530195.3623556048,
+                    147.86290316976968,
+                    -81.63601561059977,
+                    530046.4689204376,
+                    135.12680944752123,
+                    -82.26045888798633,
+                    529857.8071489362,
+                    120.98811664198581,
+                    -82.45590131181808,
+                    529629.3967046151,
+                    106.97776941047535,
+                    -82.18999296244343,
+                    529361.4257268514,
+                    94.55013223520194,
+                    -81.50583806185188,
+                    529054.2509676022,
+                    84.35033255560475,
+                    -80.49316914679638,
+                    528708.3972419407,
+                    76.29224633026114,
+                    -79.24422225078598,
+                    528324.5561921587,
+                    69.98529341830053,
+                    -77.8313650239979,
+                    527903.5843680454,
+                    65.01660644733006,
+                    -76.30505860312891,
+                    527446.5006273836,
+                    61.048660092774895,
+                    -74.699036771845,
+                    526954.482863457,
+                    57.82909924045033,
+                    -73.03574403264112,
+                    526428.8640682707,
+                    55.174764525843806,
+                    -71.33030049554387,
+                    525871.1277425773,
+                    52.95326953116686,
+                    -69.59309211349623,
+                    525282.9026660714,
+                    51.06822499292232,
+                    -67.83140835079396,
+                    524665.9570434634,
+                    49.44858235005895,
+                    -66.05047587035747,
+                    524022.192044368,
+                    48.041223393767496,
+                    -64.25411877491304,
+                    523353.6347575644,
+                    46.805853175413205,
+                    -62.445187808137796,
+                    522662.43058223743,
+                    45.71146805207622,
+                    -60.62584490272012,
+                    521950.83508168906,
+                    44.73389015652594,
+                    -58.79775562134647,
+                    521221.20532687195,
+                    43.85402548115906,
+                    -56.962221840726116,
+                    520475.99076008983,
+                    43.056616995880155,
+                    -55.12027492176637,
+                    519717.7236112291,
+                    42.32934018730086,
+                    -53.27274226167125,
+                    518949.008901434,
+                    41.662138387860495,
+                    -51.420295593846106,
+                    518172.51407141145,
+                    41.046728169112065,
+                    -49.56348656059445,
+                    517390.95827400405,
+                    40.476226876406706,
+                    -47.70277327023338,
+                    516607.10137258563,
+                    39.94486896588862,
+                    -45.838540372962306,
+                    515823.73268927075,
+                    39.44778766612423,
+                    -43.97111441252278,
+                    515043.65954864677,
+                    38.98084523294378,
+                    -42.10077568961501,
+                    514269.69566476904,
+                    38.54049973490507,
+                    -40.227767518162565,
+                    513504.64942071587,
+                    38.12369957625227,
+                    -38.35230351055995,
+                    512751.31209162995,
+                    37.72779927900456,
+                    -36.47457335676378,
+                    512012.4460632438,
+                    37.35049170313077,
+                    -34.594747440684245,
+                    511290.7730991915,
+                    36.989753082252534,
+                    -32.712980550282985,
+                    510588.96271101385,
+                    36.64379812821209,
+                    -30.829414874874033,
+                    509909.62068525515,
+                    36.31104310346338,
+                    -28.94418243689946,
+                    509255.27782246936,
+                    35.990075240945494,
+                    -27.05740707141626,
+                    508628.37894256134,
+                    35.67962725166277,
+                    -25.16920604108969,
+                    508031.2722107554,
+                    35.37855593303187,
+                    -23.27969135537057,
+                    507466.19883741904,
+                    35.08582409899479,
+                    -21.388970848077122,
+                    506935.2832040638,
+                    34.800485212380686,
+                    -19.49714905655104,
+                    506440.52346630674,
+                    34.521670223382216,
+                    -17.604327937055373,
+                    505983.78268263023,
+                    34.24857621358089,
+                    -15.710607444592243,
+                    505566.78051574435,
+                    33.98045651982062,
+                    -13.81608600015028,
+                    505191.0855507413,
+                    33.71661207070318,
+                    -11.920860864555815,
+                    504858.1082713185,
+                    33.45638371450825,
+                    -10.025028434927771,
+                    504569.0947322091,
+                    33.19914535354036,
+                    -8.128684477333119,
+                    504325.1209624605,
+                    32.944297728288504,
+                    -6.231924307436186,
+                    504127.08813031856,
+                    32.69126271690267,
+                    -4.33484292940227,
+                    503975.7184966365,
+                    32.43947803266495,
+                    -2.4375351422054083,
+                    503871.5521791866,
+                    32.18839221492746,
+                    -0.540095621766185,
+                    503814.94474611245,
+                    31.937459818346074,
+                    1.3573810135661644,
+                    503806.0656519653,
+                    31.68613671149798,
+                    3.2548001463403327,
+                    503844.89752500784,
+                    31.43387539923355,
+                    5.152067105793624,
+                    503931.2363099316,
+                    31.18012028397445,
+                    7.04908710830825,
+                    504064.6922650216,
+                    30.924302779258223,
+                    8.945765185718846,
+                    504244.6918081101,
+                    30.66583618410174,
+                    10.842006093871348,
+                    504470.48020101525,
+                    30.40411021946665,
+                    12.737714193388872,
+                    504741.12505712826,
+                    30.138485116974188,
+                    14.632793294472819,
+                    505055.520652771,
+                    29.868285135763113,
+                    16.527146454940205,
+                    505412.39301793557,
+                    29.592791363802057,
+                    18.420675721994208,
+                    505810.3057784857,
+                    29.311233635487877,
+                    20.313281804312147,
+                    506247.6667174045,
+                    29.022781365703146,
+                    22.204863660132762,
+                    506722.735019329,
+                    28.72653306026195,
+                    24.095317984006893,
+                    507233.629159024,
+                    28.421504211509625,
+                    25.984538571505485,
+                    507778.3353914488,
+                    28.10661322279026,
+                    27.872415536702295,
+                    508354.7167983018,
+                    27.78066492210166,
+                    29.758834351591098,
+                    508960.5228434047,
+                    27.442331118372334,
+                    31.643674669382385,
+                    509593.3993873745,
+                    27.09012751592008,
+                    33.526808883878104,
+                    510250.899110212,
+                    26.72238612339082,
+                    35.40810036493303,
+                    510930.49228904676,
+                    26.337222059482198,
+                    37.28740129351357,
+                    511629.57787740976,
+                    25.932493349514996,
+                    39.164549998285445,
+                    512345.4948315704,
+                    25.505751898258854,
+                    41.039367666728374,
+                    513075.53362933546,
+                    25.054183277427093,
+                    42.91165426493743,
+                    513816.9479265511,
+                    24.57453222902721,
+                    44.78118344737475,
+                    514566.9662969345,
+                    24.063009781048407,
+                    46.64769616527547,
+                    515322.8040015837,
+                    23.515176491670335,
+                    48.51089258191347,
+                    516081.67473508045,
+                    22.925794420394727,
+                    50.37042176181133,
+                    516840.80229660403,
+                    22.288637733353614,
+                    52.225868400758955,
+                    517597.43213552143,
+                    21.596248030216174,
+                    54.076735575687486,
+                    518348.8427226944,
+                    20.839614997036108,
+                    55.92242207387181,
+                    519092.35670034867,
+                    20.007755025959085,
+                    57.762192240665115,
+                    519825.3517652694,
+                    19.087148740821423,
+                    59.59513535355195,
+                    520545.27124222834,
+                    18.060980976519975,
+                    61.420110109160795,
+                    521249.63430655,
+                    16.908100642161383,
+                    63.23566760453009,
+                    521936.04581700824,
+                    15.60157834603229,
+                    65.03994271175362,
+                    522602.2057226766,
+                    14.106679501310559,
+                    66.83049815007624,
+                    523245.91800948884,
+                    12.37797943717498,
+                    68.60409641787845,
+                    523865.0991548868,
+                    10.355211394274633,
+                    70.3563595907147,
+                    524457.7860612329,
+                    7.957247044846373,
+                    72.08125162221317,
+                    525022.1434411164,
+                    5.073376913762354,
+                    73.770275370986,
+                    525556.4706301996,
+                    1.5509083197652274,
+                    75.41120741966309,
+                    526059.2078054864,
+                    -2.8214697034665934,
+                    76.98609006910586,
+                    526528.9415895352,
+                    -8.332445299253173,
+                    78.46808290694382,
+                    526964.4100233186,
+                    -15.357349097830658,
+                    79.81680309251058,
+                    527364.5068928711,
+                    -24.320389396667796,
+                    80.97256744317681,
+                    527728.2853972521,
+                    -35.52669590270157,
+                    81.85307104006769,
+                    528054.9611473894,
+                    -48.789676021144274,
+                    82.36271159165905,
+                    528343.9144881116,
+                    -63.069281949535124,
+                    82.42640308641029,
+                    528594.6921372907,
+                    -76.74990837226645,
+                    82.03354297051652,
+                    528807.0081387721,
+                    -88.56758009222018,
+                    81.24542907028335,
+                    528980.7441276535,
+                    -98.1244232082912,
+                    80.15655217802761,
+                    529115.9489087667,
+                    -105.6361940095575,
+                    78.85469176675574,
+                    529212.837351257,
+                    -111.51938184985272,
+                    77.4056711284533,
+                    529271.7886045715,
+                    -116.16995050069414,
+                    75.8545713115422,
+                    529293.3436428653,
+                    -119.90027449491076,
+                    74.23140182486493,
+                    529278.2021475285,
+                    -122.94096481950895,
+                    72.55617380228858,
+                    529227.2187391901,
+                    -125.45888314860156,
+                    70.84243563785517,
+                    529141.3985730819,
+                    -127.5747819263764,
+                    69.09954923011492,
+                    529021.8923135241,
+                    -129.3768552365534,
+                    67.33412510075081,
+                    528869.9905057102,
+                    -130.9303657034134,
+                    65.55093034107914,
+                    528687.1173649188,
+                    -132.2843080425963,
+                    63.753471190300274,
+                    528474.8240056885,
+                    -133.4760014480857,
+                    61.944373816657965,
+                    528234.781135479,
+                    -134.53427249887824,
+                    60.12563819775715,
+                    527968.7712396402,
+                    -135.48168415085047,
+                    58.29881077783693,
+                    527678.6802865723,
+                    -136.33611627824746,
+                    56.46510414423615,
+                    527366.4889843697,
+                    -137.11190131614046,
+                    54.625481483238374,
+                    527034.2636218546,
+                    -137.82065111489686,
+                    52.780717187820144,
+                    526684.146529641,
+                    -138.4718667815762,
+                    50.931441032967676,
+                    526318.3461982664,
+                    -139.0733940562648,
+                    49.07817084011394,
+                    525939.1270928234,
+                    -139.63176735907314,
+                    47.221336952688816,
+                    525548.7992051234,
+                    -140.1524726206831,
+                    45.36130080111941,
+                    525149.7073863307,
+                    -140.64015017475307,
+                    43.49836914363421,
+                    524744.2205045708,
+                    -141.09875292689622,
+                    41.632805102976285,
+                    524334.7204735056,
+                    -141.53167080430458,
+                    39.76483680065097,
+                    523923.591199209,
+                    -141.94182953237964,
+                    37.89466416945534,
+                    523513.20749390963,
+                    -142.3317696836488,
+                    36.02246437004666,
+                    523105.92400590517,
+                    -142.70371043582546,
+                    34.14839612707796,
+                    522704.0642159181,
+                    -143.0596013815294,
+                    32.27260322119497,
+                    522309.9095505271,
+                    -143.4011649305135,
+                    30.39521731570737,
+                    521925.68866351154,
+                    -143.72993125255502,
+                    28.516360254320748,
+                    521553.5669360515,
+                    -144.04726726691672,
+                    26.636145935177655,
+                    521195.6362462016,
+                    -144.35440085181312,
+                    24.75468184286616,
+                    520853.9050576398,
+                    -144.6524411949327,
+                    22.87207030256211,
+                    520530.288876703,
+                    -144.9423960138093,
+                    20.98840950700042,
+                    520226.6011253819,
+                    -145.2251862263712,
+                    19.10379435667132,
+                    519944.54447660875,
+                    -145.5016585377853,
+                    17.21831714593076,
+                    519685.7026961474,
+                    -145.77259632028884,
+                    15.332068121417125,
+                    519451.53303329647,
+                    -146.03872909319338,
+                    13.445135934561911,
+                    519243.35920024756,
+                    -146.30074085548375,
+                    11.557608006262905,
+                    519062.364976936,
+                    -146.55927748045534,
+                    9.669570818842397,
+                    518909.58847549837,
+                    -146.81495334803625,
+                    7.781110148279865,
+                    518785.91709493566,
+                    -147.06835736385048,
+                    5.892311247792438,
+                    518692.0831931783,
+                    -147.32005849341155,
+                    4.003258992596639,
+                    518628.6604999397,
+                    -147.57061092391518,
+                    2.114037994539303,
+                    518596.0612899428,
+                    -147.82055895408456,
+                    0.22473269492435854,
+                    518594.5343318032,
+                    -148.07044170411498,
+                    -1.6645725580521793,
+                    518624.16362397093,
+                    -148.32079773192433,
+                    -3.5537934387342096,
+                    518684.8679244984,
+                    -148.57216963923548,
+                    -5.442845574678858,
+                    518776.4010773618,
+                    -148.82510875066674,
+                    -7.331644471179067,
+                    518898.35313347727,
+                    -149.0801799511243,
+                    -9.220105422734349,
+                    519050.15226028115,
+                    -149.33796677191114,
+                    -11.108143404252935,
+                    519231.06742950995,
+                    -149.59907682347773,
+                    -12.995672933853156,
+                    519440.21186841466,
+                    -149.86414768423063,
+                    -14.882607899370724,
+                    519676.54725579545,
+                    -150.13385336919228,
+                    -16.76886133838086,
+                    519938.8886400517,
+                    -150.4089115222012,
+                    -18.65434516137689,
+                    520225.9100528639,
+                    -150.69009149997746,
+                    -20.53896980553457,
+                    520536.1507884329,
+                    -150.97822354851056,
+                    -22.422643804543913,
+                    520868.0223149499,
+                    -151.27420931257737,
+                    -24.305273257204732,
+                    521219.81578193326,
+                    -151.5790339708006,
+                    -26.18676117405023,
+                    521589.71008413937,
+                    -151.89378035430127,
+                    -28.067006676823837,
+                    521975.7804403817,
+                    -152.21964549074417,
+                    -29.945904019853494,
+                    522376.0074433051,
+                    -152.55796012338396,
+                    -31.823341395015614,
+                    522788.2865342889,
+                    -152.91021189343684,
+                    -33.69919947238978,
+                    523210.43785605207,
+                    -153.278073054691,
+                    -35.573349616135644,
+                    523640.21643424314,
+                    -153.66343382483157,
+                    -37.44565169870242,
+                    524075.3226383468,
+                    -154.0684427885342,
+                    -39.315951414593556,
+                    524513.4128715545,
+                    -154.4955561790375,
+                    -41.18407696588957,
+                    524952.1104388982,
+                    -154.94759841592975,
+                    -43.0498349523558,
+                    525389.0165428864,
+                    -155.42783702018198,
+                    -44.9130052458759,
+                    525821.7213559467,
+                    -155.94007603979657,
+                    -46.773334555560886,
+                    526247.8151195925,
+                    -156.48877351155545,
+                    -48.63052828867383,
+                    526664.8992208214,
+                    -157.07919041808853,
+                    -50.48424016997886,
+                    527070.5971971881,
+                    -157.71758131430985,
+                    -52.33405888011643,
+                    527462.5656230524,
+                    -158.41144065139918,
+                    -54.1794906830424,
+                    527838.5048308745,
+                    -159.16982436021254,
+                    -56.0199365887867,
+                    528196.1694229059,
+                    -160.00377429522766,
+                    -57.85466197113915,
+                    528533.3785300748,
+                    -160.92688495576192,
+                    -59.68275561855602,
+                    528848.0257767914,
+                    -161.95606946576805,
+                    -61.503073759732715,
+                    529138.0889121192,
+                    -163.11260817557556,
+                    -63.314162374656604,
+                    529401.6390696522,
+                    -164.42360320416202,
+                    -65.11414757856495,
+                    529636.8496206291,
+                    -165.9240230068264,
+                    -66.9005782026489,
+                    529842.0045865411,
+                    -167.6596131294276,
+                    -68.67019543874557,
+                    530015.506579983,
+                    -169.69108612151578,
+                    -70.41858906462011,
+                    530155.8842442585,
+                    -172.1001959633229,
+                    -72.13967407117005,
+                    530261.7991646938,
+                    -174.99853428703673,
+                    -73.82487857187992,
+                    530332.052226562,
+                    -178.54002836958168,
+                    -75.4618639545712,
+                    530365.5893968251,
+                    177.06234136200652,
+                    -77.0324938228419,
+                    530361.5069090277,
+                    171.51784690767752,
+                    -78.50965222294319,
+                    530319.055832738,
+                    164.44936741030648,
+                    -79.85254732724196,
+                    530237.6460113805,
+                    155.43326914098748,
+                    -81.00095558931184,
+                    530116.8493538983,
+                    144.17195519088116,
+                    -81.87206669940227,
+                    529956.402468591,
+                    130.87055640242718,
+                    -82.37030652749225,
+                    529756.2086288007,
+                    116.59022308288255,
+                    -82.42172581150916,
+                    529516.3390628723,
+                    102.94836462293875,
+                    -82.01759631866351,
+                    529237.0335625755,
+                    91.18870325267204,
+                    -81.2204800346538,
+                    528918.7004063819,
+                    81.68856704776854,
+                    -80.12494322018514,
+                    528561.9155963799,
+                    74.22317626910643,
+                    -78.81819684290403,
+                    528167.4214092409,
+                    68.37518599582361,
+                    -77.36543494453872,
+                    527736.124264366,
+                    63.75066717131296,
+                    -75.81126116858057,
+                    527269.0919141257,
+                    60.03959391746599,
+                    -74.18536633052481,
+                    526767.5499636047,
+                    57.0132593190523,
+                    -72.50755756628892,
+                    526232.877729197,
+                    54.506188928658496,
+                    -70.79125348155371,
+                    525666.6034480594,
+                    52.39860538710243,
+                    -69.04573268759786,
+                    525070.3988522785,
+                    50.60299489724554,
+                    -67.27755155686776,
+                    524446.0731243258,
+                    49.05457190886963,
+                    -65.4914415527924,
+                    523795.56625252496,
+                    47.70467993347436,
+                    -63.69088530847411,
+                    523120.9418076994,
+                    46.51624277261357,
+                    -61.878493378738305,
+                    522424.37916453555,
+                    45.46061088436617,
+                    -60.056255579114676,
+                    521708.165193717,
+                    44.51535209188345,
+                    -58.2257120092408,
+                    520974.6854532035,
+                    43.66268441511428,
+                    -56.388071658460404,
+                    520226.41490951367,
+                    42.88834961107403,
+                    -54.544296146482495,
+                    519465.9082222488,
+                    42.180792705116936,
+                    -52.695159844889126,
+                    518695.7896275241,
+                    41.53055664833658,
+                    -50.841293716191984,
+                    517918.74245821405,
+                    40.929830151459655,
+                    -48.983217741904824,
+                    517137.4983412251,
+                    40.372105957268765,
+                    -47.121365229355874,
+                    516354.826114296,
+                    39.8519197055716,
+                    -45.25610125431141,
+                    515573.5205066139,
+                    39.36464829416794,
+                    -43.387736811586755,
+                    514796.39062986244,
+                    38.906352645965896,
+                    -41.516539784153814,
+                    514026.24832777306,
+                    38.47365396521062,
+                    -39.64274352575141,
+                    513265.89643406775,
+                    38.06363549777894,
+                    -37.76655363310672,
+                    512518.1169900978,
+                    37.67376389380032,
+                    -35.88815333025753,
+                    511785.65947459266,
+                    37.301825767236856,
+                    -34.007707778145715,
+                    511071.22909897566,
+                    36.94587613260325,
+                    -32.125367544142975,
+                    510377.4752224507,
+                    36.604196194795456,
+                    -30.241271409002596,
+                    509706.9799413141,
+                    36.27525855613366,
+                    -28.355548646773528,
+                    509062.24690728635,
+                    35.95769834395421,
+                    -26.46832088221699,
+                    508445.69042923395,
+                    35.650289092207856,
+                    -24.579703606945174,
+                    507859.62491225265,
+                    35.35192246111876,
+                    -22.689807418016606,
+                    507306.2546871975,
+                    35.06159107015224,
+                    -20.79873902946572,
+                    506787.66428239085,
+                    34.77837386672645,
+                    -18.906602096996142,
+                    506305.80918776896,
+                    34.50142356689872,
+                    -17.01349788838502,
+                    505862.5071597742,
+                    34.2299557928971,
+                    -15.119525825905876,
+                    505459.4301128704,
+                    33.96323960145566,
+                    -13.224783922592346,
+                    505098.09664107114,
+                    33.70058915141286,
+                    -11.329369130373655,
+                    504779.8652098095,
+                    33.44135630151673,
+                    -9.433377615280362,
+                    504505.928055156,
+                    33.1849239631123,
+                    -7.536904972720889,
+                    504277.30582388677,
+                    32.930700058561804,
+                    -5.640046394101055,
+                    504094.8429839611,
+                    32.678111956786985,
+                    -3.7428967946402167,
+                    503959.20403086673,
+                    32.42660127299271,
+                    -1.845550911353468,
+                    503870.87051106896,
+                    32.175618931311945,
+                    0.05189662096470506,
+                    503830.1388790831,
+                    31.924620397589397,
+                    1.9493512073836845,
+                    503837.11920039635,
+                    31.673060994454676,
+                    3.8467182380105673,
+                    503891.73470726237,
+                    31.420391213870598,
+                    5.7439030326528835,
+                    503993.7222100729,
+                    31.166051941858424,
+                    7.640810778273965,
+                    504142.6333617773,
+                    30.90946950760566,
+                    9.537346451902128,
+                    504337.83676831704,
+                    30.65005046358775,
+                    11.433414721349546,
+                    504578.5209330199
+                ]
+            }
+
+            return data_readings;
+
+
+        }
+
+        // finding the current location
+        var cur_loc = {};
+        //successCallback
+        function success(position) {
+            cur_loc.lat = position.coords.latitude; // 24.598284
+            cur_loc.lon = position.coords.longitude; // 73.7242486
+        }
+        //failureCallback
+        function failure(position) {
+            cur_loc.lat = 0;
+            cur_loc.lon = 0;
+        }
+        //location fetch
+        function getLocation() {
+            navigator.geolocation.getCurrentPosition(success, failure);
+            console.log(cur_loc);
+
+            //       {
+            //     "lat": 24.598284,
+            //     "lon": 73.7242486
+            // }
+            return cur_loc;
+        }
+        getLocation();
+        console.log(cur_loc.lat, cur_loc.lon);  // bothh undifiend
+
+
+        // Cesium Viewer Setup
+        Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI4ZjM0YTMzOC04NTIwLTQwMTItYTg5Ni0wOTFhNjlkZTJiYzIiLCJpZCI6MTUzNzcwLCJpYXQiOjE2ODkyNjg2NjV9.JHjxyoN8RovBonODf3w6B654ZNhxvoqCbAqAsKZrxBY'
+        const viewer = new Cesium.Viewer('cesiumContainer', {
+            terrain: Cesium.Terrain.fromWorldTerrain(),
+        });
+
+
+        // Getting Data Over Time
+        const data_readings = get_data_buffer();
+
+       const len_data = Object.keys(data_readings).length - 1; // 237
+
+        console.log(data_readings['geodetic'])
+
+        /*
+        
+        [
+        -157.61601401392548,
+        -51.86514169985873,
+        527409.3143405635,
+        -158.294990400465,
+        -53.71171689744941,
+        527789.38415311,
+        -159.03602179495587,
+        -55.55347002308595,
+        528151.6997929476,
+        -159.84959843485032,
+        -57.389704333662394,
+        528494.0633537583,
+        -160.74860302800695,
+        -59.219558119083686,
+        528814.3489669431,
+        -161.74901946723543,
+        -61.04195307242101,
+        529110.5125199426,
+        -162.87089985207854,
+        -62.85552291600056,
+        529380.6010127589,
+        -164.13970135692392,
+        -64.65851312698827,
+        529622.7615164211,
+        -165.58815911098492,
+        -66.44863759379224,
+        529835.2496994361,
+        -167.25894419579467,
+        -68.22286987604691,
+        530016.4378902093,
+        -169.20847999726846,
+        -69.97713325647972,
+        530164.8226454854,
+        -171.5124681241707,
+        -71.705831238356,
+        530279.0317972647,
+        -174.27390217911787,
+        -73.4011224079742,
+        530357.8309525112,
+        -177.634538672818,
+        -75.05178150872155,
+        530400.1294222847,
+        178.20942217825979,
+        -76.64139288080992,
+        530404.9855591292,
+        172.98858683362207,
+        -78.14550274170998,
+        530371.6114836037,
+        166.34697404317868,
+        -79.5273213747036,
+        530299.3771830341,
+        157.86354384023986,
+        -80.73207909736188,
+        530187.8139678268,
+        147.18099081690036,
+        -81.68253643306478,
+        530036.6172725847,
+        134.33317871974333,
+        -82.28415458225173,
+        529845.6487916028,
+        120.1558907377554,
+        -82.45301013213881,
+        529614.9379404401,
+        106.20342295012809,
+        -82.16100835421008,
+        529344.6826371737,
+        93.8961471868606,
+        -81.45515060425132,
+        529035.2493994031,
+        83.82775436863697,
+        -80.42640303625902,
+        528687.1727548353,
+        75.88295388631039,
+        -79.16620276968037,
+        528301.1539657945,
+        69.66434102668086,
+        -77.74557929689095,
+        527878.0590698952,
+        64.76203089156498,
+        -76.21386160084059,
+        527418.9162412882,
+        60.84360876100765,
+        -74.60399243971364,
+        526924.9124794528,
+        57.661250322223005,
+        -72.93789844759732,
+        526397.3896341808,
+        55.03521881479411,
+        -71.23036566136714,
+        525837.8397781113,
+        52.835576152673966,
+        -69.49156298688138,
+        525247.899940338,
+        50.96765725079121,
+        -67.7286365329347,
+        524629.346216768,
+        49.361629226602716,
+        -65.94671637120801,
+        523984.0872755181,
+        47.96523869555608,
+        -64.14956016527037,
+        523314.1572778607,
+        46.7388135782863,
+        -62.339972036142186,
+        522621.70823760517,
+        45.65180499866286,
+        -60.52008058024855,
+        521909.00184440985,
+        44.680371751152606,
+        -58.69152710864872,
+        521178.4007787248,
+        43.805672444158034,
+        -56.855595575586,
+        520432.3595485715,
+        43.01264205591721,
+        -55.01330390730782,
+        519673.4148809174,
+        42.289103796143166,
+        -53.16546930107557,
+        518904.17570252065,
+        41.62511594644563,
+        -51.31275565764147,
+        518127.31274770293,
+        41.01248547551818,
+        -49.45570854362456,
+        517345.5478326725,
+        40.444401519553075,
+        -47.594781312663955,
+        516561.6428382257,
+        39.91515607065551,
+        -45.730354865381955,
+        515778.3884448102,
+        39.4199288596535,
+        -43.86275276913674,
+        514998.59266586695,
+        38.95462002129501,
+        -41.992252949010286,
+        514225.06922720745,
+        38.51571870195662,
+        -40.11909681433438,
+        513460.6258419454,
+        38.10019897349195,
+        -38.243496445322585,
+        512708.052431765,
+        37.70543668665049,
+        -36.36564029632274,
+        511970.1093468731,
+        37.329142523465364,
+        -34.48569775337647,
+        511249.51563778054,
+        36.96930768459394,
+        -32.60382279820507,
+        510548.93743287586,
+        36.62415950791894,
+        -30.720156969086517,
+        509870.97647637315,
+        36.292124949235756,
+        -28.83483176359807,
+        509218.1588812433,
+        35.97180032852814,
+        -26.94797059477885,
+        508592.92415167205,
+        35.66192609997678,
+        -25.059690387252843,
+        507997.61452926695,
+        35.36136567244538,
+        -23.170102881039803,
+        507434.46471615694,
+        35.06908751183027,
+        -21.27931569655773,
+        506905.5920272935,
+        34.78414991384565,
+        -19.38743320338913,
+        506412.9870225899,
+        34.50568795732321,
+        -17.494557227118463,
+        505958.50466757733,
+        34.232902242286265,
+        -15.600787622023491,
+        505543.856069413,
+        33.96504909094758,
+        -13.706222732446108,
+        505170.6008320488,
+        33.70143194731068,
+        -11.8109597617097,
+        504840.14007180184,
+        33.44139375661383,
+        -9.91509506454031,
+        504553.71013129223,
+        33.18431014138477,
+        -8.018724376417689,
+        504312.37702602055,
+        32.92958321893899,
+        -6.121942991500478,
+        504117.03165432345,
+        32.67663592703909,
+        -4.22484589942231,
+        503968.3857971877,
+        32.424906741087376,
+        -2.3275278899747978,
+        503866.96893021185,
+        32.173844679101556,
+        -0.43008363407981637,
+        503813.1258655805,
+        31.922904499682797,
+        1.4673922514597255,
+        503807.0152372308,
+        31.671542004311405,
+        3.3648051476063205,
+        503848.6088377312,
+        31.41920935849318,
+        5.26206037876216,
+        503937.6918105921,
+        31.165350346889213,
+        7.159063152712031,
+        504073.8636968238,
+        30.909395475530395,
+        9.055718488021748,
+        504256.5403298745,
+        30.650756829402706,
+        10.951931121193716,
+        504484.95656821504,
+        30.388822586052758,
+        12.847605385559186,
+        504758.16985011287,
+        30.122951074701877,
+        14.742645053718201,
+        505075.06455089897,
+        29.852464255770442,
+        16.63695313254548,
+        505434.3571180552,
+        29.57664047578293,
+        18.530431601338456,
+        505834.60195603874,
+        29.294706327972722,
+        20.42298107941859,
+        506274.19802815747,
+        29.005827416588513,
+        22.31450040886568,
+        506751.3961395351,
+        28.709097782196515,
+        24.20488613480103,
+        507264.30686166603,
+        28.403527693473904,
+        26.094031862269787,
+        507810.90905598365,
+        28.088029444792983,
+        27.981827464324947,
+        508389.05895122886,
+        27.761400714494187,
+        29.868158110035832,
+        508996.49972685985,
+        27.422304930252018,
+        31.752903073875444,
+        509630.87155276444,
+        27.06924794783808,
+        33.63593427810214,
+        510289.7220338946,
+        26.700550167759864,
+        35.51711450727707,
+        510970.5170069989,
+        26.31431297640438,
+        37.3962952173368,
+        511670.65163565334,
+        25.90837808512652,
+        39.2733138397064,
+        512387.46174930036,
+        25.480277925129073,
+        41.147990451490564,
+        513118.23537151143,
+        25.027174699682398,
+        43.02012364331544,
+        513860.2243827721,
+        24.545784944735686,
+        44.88948536235461,
+        514610.6562635582,
+        24.032285425918623,
+        46.75581443443843,
+        515366.7458638381,
+        23.482194793465,
+        48.61880836642269,
+        516125.7071463084,
+        22.890223461344924,
+        50.47811288612251,
+        516884.7648515431,
+        22.250081431329797,
+        52.33330847280092,
+        517641.16603481397,
+        21.554229883270665,
+        54.183892836942064,
+        518392.19142584037,
+        20.7935567516445,
+        56.029257879240596,
+        519135.16656438075,
+        19.956948367832002,
+        57.86865902375718,
+        519867.4726666603,
+        19.030717277505964,
+        59.701173866221254,
+        520586.5571795413,
+        17.997828541228433,
+        61.525645621309366,
+        521289.9439815171,
+        16.83684007782073,
+        63.34060458917134,
+        521975.2431919202,
+        15.520432087368716,
+        65.14415728412145,
+        522640.16055195406,
+        14.013338951057008,
+        66.93382711419706,
+        523282.50634360407,
+        12.269403619080382,
+        68.70632109027397,
+        523900.2038148297,
+        10.227335852800106,
+        70.45718143067946,
+        524491.297081911,
+        7.804561197106782,
+        72.18025478580094,
+        525053.9584822068,
+        4.888314888732359,
+        73.86686812976644,
+        525586.4953531111,
+        1.3229992566786057,
+        75.50452934119093,
+        526087.3562152274,
+        -3.106678298914638,
+        77.07486490147504,
+        526555.1363404179,
+        -8.694380730408977,
+        78.5503918906798,
+        526988.5826875959,
+        -15.820071846872631,
+        79.88976837429976,
+        527386.5981914941,
+        -24.907440006806496,
+        81.03203173488666,
+        527748.2453920953,
+        -36.24516324899172,
+        81.89365665704143,
+        528072.7493944345,
+        -49.60417892134726,
+        82.37905488794414,
+        528359.5001511564,
+        -63.89448954330835,
+        82.41579492329043,
+        528608.0540619856,
+        -77.49387757545546,
+        81.99779217622107,
+        528818.1348867649,
+        -89.1832885078879,
+        81.18958155795704,
+        528989.6339708781,
+        -98.61208318653449,
+        80.08614558055199,
+        529122.609784022,
+        -106.01762998210371,
+        78.77417796466013,
+        529217.2867752062,
+        -111.81924633873989,
+        77.31818062192929,
+        529274.0535496594,
+        -116.40878517944131,
+        75.76219989141461,
+        529293.4603745313,
+        -120.09353286559549,
+        74.1355416056598,
+        529276.2160233865,
+        -123.09987667655385,
+        72.45775983223207,
+        529223.1839709124,
+        -125.59155769246952,
+        70.74210799929367,
+        529135.3779518232,
+        -127.68711223377174,
+        68.99775559634429,
+        529013.9568998534,
+        -129.47317521840856,
+        67.23118536509615,
+        528860.219285245,
+        -131.01390781421767,
+        65.44707778984562,
+        528675.5968708461,
+        -132.35751862218285,
+        63.64887918799941,
+        528461.6479095053,
+        -133.5407585060211,
+        61.839173443030624,
+        528220.0498075383,
+        -134.59203745908542,
+        60.01993013960566,
+        527952.5912810108,
+        -135.53360883858693,
+        58.19267350436263,
+        527661.1640341086,
+        -136.38311933952127,
+        56.358599631934354,
+        527347.7539906539,
+        -137.15472353382165,
+        54.51865929467527,
+        527014.4321122114,
+        -137.8598959763712,
+        52.673617424647205,
+        526663.344838189,
+        -138.50803060749095,
+        50.8240965059466,
+        526296.7041852949,
+        -139.10688864680105,
+        48.97060868578232,
+        525916.7775457986,
+        -139.66293721043175,
+        47.11357985314525,
+        525525.8772257958,
+        -140.18160815459564,
+        45.25336791515651,
+        525126.3497664556,
+        -140.66749800736167,
+        43.39027682513146,
+        524720.5650928859,
+        -141.12452391555573,
+        41.52456746062612,
+        524310.9055366497,
+        -141.5560464098295,
+        39.65646613796478,
+        523899.7547794059,
+        -141.96496689201715,
+        37.78617133345191,
+        523489.4867662173,
+        -142.35380568858133,
+        35.91385902955143,
+        523082.4546379354,
+        -142.7247650335424,
+        34.03968699627483,
+        522680.9797329921,
+        -143.07978026992217,
+        32.16379824020485,
+        522287.34070912935,
+        -143.4205617711826,
+        30.286323797101215,
+        521903.7628360875,
+        -143.7486295014645,
+        28.407385002464316,
+        521532.4075099975,
+        -144.06534169862496,
+        26.527095343693187,
+        521175.3620400429,
+        -144.3719188369125,
+        24.645561974405226,
+        520834.62975724693,
+        -144.66946377773985,
+        22.76288695410874,
+        520512.1204942819,
+        -144.95897882758618,
+        20.879168263333487,
+        520209.64148406126,
+        -145.24138027598877,
+        18.994500634084098,
+        519928.8887232002,
+        -145.51751087388476,
+        17.10897622785967,
+        519671.43884458486,
+        -145.78815062447057,
+        15.222685187371694,
+        519438.74154116213,
+        -146.05402619027416,
+        13.335716083520046,
+        519232.1125805443,
+        -146.31581916598728,
+        11.448156275440441,
+        519052.72744725645,
+        -146.57417342442355,
+        9.560092198682824,
+        518901.6156463418,
+        -146.82970170942713,
+        7.671609594325239,
+        518779.6556989942,
+        -147.08299162348246,
+        5.782793690035045,
+        518687.5708568897,
+        -147.33461113739966,
+        3.8937293428794564,
+        518625.9255586844,
+        -147.58511373367003,
+        2.004501152470533,
+        518595.12264779303,
+        -147.8350432834537,
+        0.11519355268681353,
+        518595.4013666874,
+        -148.08493874877504,
+        -1.7741091114561034,
+        518626.83613864146,
+        -148.33533879589825,
+        -3.663322513515482,
+        518689.3361437451,
+        -148.58678640339366,
+        -5.552362276111634,
+        518782.64569130633,
+        -148.83983354801657,
+        -7.441143894894489,
+        518906.34538685065,
+        -149.09504605399943,
+        -9.329582649035522,
+        519059.85408712085,
+        -149.35300869648844,
+        -11.217593491023772,
+        519242.43163256533,
+        -149.61433065764137,
+        -13.105090907567952,
+        519453.1823422983,
+        -149.87965144548366,
+        -14.99198874371245,
+        519691.0592526272,
+        -150.14964740039932,
+        -16.87819997984699,
+        519954.86907621846,
+        -150.42503893416506,
+        -18.763636451238963,
+        520243.2778552035,
+        -150.7065986715298,
+        -20.648208497340253,
+        520554.817278008,
+        -150.9951606968792,
+        -22.531824526250876,
+        520887.891626426,
+        -151.2916311494398,
+        -24.414390476849707,
+        521240.78531628195,
+        -151.59700046288313,
+        -26.295809157625953,
+        521611.67099238187,
+        -151.91235761158754,
+        -28.175979436736277,
+        521998.61813585367,
+        -152.2389068110027,
+        -30.054795251946004,
+        522399.6021398138,
+        -152.57798722876848,
+        -31.932144401709625,
+        522812.51380752586,
+        -152.93109640414292,
+        -33.80790706875639,
+        523235.1692253733,
+        -153.2999182566701,
+        -35.68195401498509,
+        523665.31996202935,
+        -153.68635680426746,
+        -37.55414436956595,
+        524100.6635440262,
+        -154.09257702662654,
+        -39.42432291014348,
+        524538.8541573212,
+        -154.52105472833705,
+        -41.292316707194644,
+        524977.5135242511,
+        -154.97463781669208,
+        -43.15793096190287,
+        525414.2419049526,
+        -155.4566221656538,
+        -45.020943813484905,
+        525846.6291727414,
+        -155.97084626850912,
+        -46.88109981748454,
+        526272.2659133188,
+        -156.5218102999791,
+        -48.73810169297444,
+        526688.7544983262,
+        -157.11482718042785,
+        -50.59159979160599,
+        527093.7200848116,
+        -157.75621600427127,
+        -52.44117853492281,
+        527484.8214931814,
+        -158.45355212940052,
+        -54.28633876959385,
+        527859.7619175371,
+        -159.21599387736774,
+        -56.12647455682893,
+        528216.2994238632,
+        -160.05471401230767,
+        -57.9608422710572,
+        528552.2571929973,
+        -160.98347625312473,
+        -59.7885189184751,
+        528865.5334671289,
+        -162.01941505259254,
+        -61.60834511299546,
+        529154.111160445,
+        -163.1841038960462,
+        -63.41884585755096,
+        529416.0670964364,
+        -164.5050383085485,
+        -65.21811865883556,
+        529649.580836283,
+        -166.01772202002795,
+        -67.00367267879261,
+        529852.9430650054,
+        -167.7686390234833,
+        -68.77219309770945,
+        530024.5635040272,
+        -169.8195340843858,
+        -70.51918905048316,
+        530162.9783208594,
+        -172.25361986620877,
+        -72.23845702087159,
+        530266.8570089927,
+        -175.1845609816068,
+        -73.9212473597623,
+        530335.0087130228,
+        -178.76921314263598,
+        -75.55494979429352,
+        530366.3879763419,
+        176.7754356993257,
+        -77.12100750037943,
+        530360.0998908216,
+        171.15367149385085,
+        -78.59165521177579,
+        530315.404630065,
+        163.98379868969027,
+        -79.92513355015663,
+        530231.7213501176,
+        154.84295757488053,
+        -81.05993448381518,
+        530108.6314433692,
+        143.45057925819387,
+        -81.91204108246318,
+        529945.881133833,
+        130.0548341179311,
+        -82.3859452749819,
+        529743.3834038731,
+        115.76630891732633,
+        -82.41041928098151,
+        529501.2192447959,
+        102.20747346819701,
+        -81.98125581329528,
+        529219.6382255917,
+        90.5764605883558,
+        -81.1641863608209,
+        528899.0583765199,
+        81.20391215802776,
+        -80.05421140162792,
+        528540.0653860858,
+        73.84407278928222,
+        -78.7374402950081,
+        528143.411112437,
+        68.07705791989765,
+        -77.27775172973347,
+        527710.0114119649,
+        63.51311339908024,
+        -75.71872462911291,
+        527240.9432905139,
+        59.84728590721335,
+        -74.08935406753129,
+        526737.4413844366,
+        56.85506112200555,
+        -72.40899540227115,
+        526200.8937813062,
+        54.374057924803694,
+        -70.69077560822026,
+        525632.8371920474,
+        52.28669497076152,
+        -68.94378297071052,
+        525034.9514887799,
+        50.50700363007178,
+        -67.17444739620758,
+        524409.0536249969,
+        48.97129023442659,
+        -65.38741458570163,
+        523757.09095681924,
+        47.63167786279718,
+        -63.58610780597425,
+        523081.1339867925,
+        46.45165413466079,
+        -61.77309570167124,
+        522383.36855386104,
+        45.402982947375286,
+        -59.95033795463441,
+        521666.08749563154,
+        44.463539499578665,
+        -58.11935263118785,
+        520931.6818115534,
+        43.6157733978111,
+        -56.281332362594725,
+        520182.63135795295,
+        42.845603105565054,
+        -54.43722645575054,
+        519421.49510828126,
+        42.14161009243886,
+        -52.58779989945638,
+        518650.90101446584,
+        41.49444384169292,
+        -50.73367642737979,
+        517873.5355072813,
+        40.89637710572018,
+        -48.875370397505485,
+        517092.1326761991,
+        40.340969565718595,
+        -47.013310705212064,
+        516309.4631712567,
+        39.822810653711635,
+        -45.14785893944033,
+        515528.32287139166,
+        39.337320852804346,
+        -43.27932332210795,
+        514751.52136595827,
+        38.88059667090556,
+        -41.407969519666594,
+        513981.8702975875,
+        38.449288570297206,
+        -39.53402910670859,
+        513222.1716163941,
+        38.04050400882058,
+        -37.65770624744009,
+        512475.20579685085,
+        37.65172979181298,
+        -35.779183009997915,
+        511743.720069889,
+        37.280769402116896,
+        -33.89862362159722,
+        511030.41672367044,
+        36.92569204151044,
+        -32.01617789522684,
+        510337.94152727537,
+        36.58479089859448,
+        -30.13198400270838,
+        509668.8723318195,
+        36.25654873634248,
+        -28.24617072750025,
+        509025.7079037009,
+        35.93960932445607,
+        -26.35885930032331,
+        508410.8570444463,
+        35.632753566383506,
+        -24.470164897578357,
+        507826.62805097364,
+        35.334879417709445,
+        -22.580197865545454,
+        507275.2185693709,
+        35.044984880648954,
+        -20.68906472004404,
+        506758.7058937829,
+        34.76215350461666,
+        -18.796868961379275,
+        506279.0377606377,
+        34.48554193478103,
+        -16.90371173662154,
+        505838.0236862879,
+        34.21436913799389,
+        -15.009692375351413,
+        505437.32689392194,
+        33.94790700361066,
+        -13.1149088203529,
+        505078.4568728795,
+        33.68547207034432,
+        -11.21945797110563,
+        504762.76261054166,
+        33.42641817235141,
+        -9.323435955186795,
+        504491.4265336478,
+        33.17012983089555,
+        -7.426938340466676,
+        504265.4591922313,
+        32.91601624375788,
+        -5.530060299160832,
+        504085.6947156107,
+        32.66350574485782,
+        -3.6328967337339164,
+        503952.7870655721,
+        32.41204062188123,
+        -1.7355423733626465,
+        503867.20710770506,
+        32.16107219128223,
+        0.1619081510607734,
+        503829.24051729497,
+        31.910056038156508,
+        2.0593602452073116,
+        503838.9865314653,
+        31.658447333517742,
+        3.9567192966603097,
+        503896.35755463317,
+        31.405696144073247,
+        5.853890619338076,
+        504001.0796193769,
+        31.151242649203287,
+        7.750779390310172,
+        504152.6937002195,
+        30.894512177101088,
+        9.64729057164945,
+        504350.5578727117,
+        30.634909966273078,
+        11.543328809598117,
+        504593.85030578636,
+        30.37181554994255,
+        13.438798303199096,
+        504881.5730704861,
+        30.10457664883162,
+        15.33360263261433,
+        505212.5567437364,
+        29.83250244139662,
+        17.227644537978357,
+        505585.4657816058,
+        29.554856059596258,
+        19.120825636755576,
+        505998.8046322204,
+        29.270846131210526,
+        21.01304606654739,
+        506450.92455485,
+        28.979617155042064,
+        22.904204037881534,
+        506940.0311079435,
+        28.68023845149455,
+        24.794195278383302,
+        507464.19226558786,
+        28.371691375102532,
+        26.682912346203494,
+        508021.34711909574,
+        28.05285440418996,
+        28.570243785554553,
+        508609.315117538,
+        27.722485631648798,
+        30.456073091073268,
+        509225.8057988705,
+        27.379202063380877,
+        32.34027743961571,
+        509868.42896143533,
+        27.021454979116733,
+        34.22272613762785,
+        510534.7052238304,
+        26.647500412782072,
+        36.103278718430225,
+        511222.0769201312,
+        26.255363550579403,
+        37.98178260574239,
+        511927.91927641165,
+        25.84279550329729,
+        39.8580702355821,
+        512649.5518140448,
+        25.407220454592217,
+        41.73195549662223,
+        513384.24992515333,
+        24.94567057686395,
+        43.60322930536167,
+        514129.2565654749,
+        24.45470528065656,
+        45.47165407335869,
+        514881.7940105824,
+        23.930310235060816,
+        47.336956741795,
+        515639.0756219141,
+        23.367770039713356,
+        49.198819945072195,
+        516398.31757022813,
+        22.761506258274558,
+        51.05687070455455,
+        517156.75046505313
+    ]
+        
+        */
+
+
+        // Plotting data using databuffer 
+
+        const start = Cesium.JulianDate.fromIso8601(data_readings[0].iso_string); // 2024-11-30T08:01:20Z
+        const stop = Cesium.JulianDate.fromIso8601(data_readings[len_data - 1].iso_string); // 2024-11-30T15:53:20Z
+
+
+        const positionsOverTime = new Cesium.SampledPositionProperty();
+        for (let i = 0; i < len_data; i++) { // 237
+            const instance = data_readings[i];
+            const time = Cesium.JulianDate.fromIso8601(instance.iso_string);
+            const position = Cesium.Cartesian3.fromDegrees(instance.longitude, instance.latitude, instance.height * 1000);
+            positionsOverTime.addSample(time, position)
+        }
+
+        // Visualize the satellite with a dot and orbit.
+
+        const orbit = viewer.entities.add({
+            availability: new Cesium.TimeIntervalCollection([new Cesium.TimeInterval({ start: start, stop: stop })]),
+            position: positionsOverTime,
+
+
+        });
+
+        const fixedPolyline = Cesium.Cartesian3.fromDegreesArrayHeights(data_readings['geodetic']);
+        const redLine = viewer.entities.add({
+            polyline: {
+                // This callback updates positions each frame.
+                positions: new Cesium.CallbackProperty(function (time, result) {
+                    var icrfToFixed = Cesium.Transforms.computeIcrfToFixedMatrix(time);
+                    var icrfToFixed = Cesium.Transforms.computeIcrfToFixedMatrix(time);
+                    if (Cesium.defined(icrfToFixed)) {
+                        let pos = [];
+                        for (let i = 0; i < fixedPolyline.length; i++) {
+                            let new_point = (Cesium.Matrix3.multiplyByVector(icrfToFixed, fixedPolyline[i], new Cesium.Cartesian3()));
+                            var cartographic = Cesium.Cartographic.fromCartesian(new_point);
+                            pos = pos.concat(Cesium.Math.toDegrees(cartographic.longitude), Cesium.Math.toDegrees(cartographic.latitude), cartographic.height);
+                        }
+                        // console.log(pos)
+                        return Cesium.Cartesian3.fromDegreesArrayHeights(pos,);
+                    }
+                }, false),
+                width: 2,
+                material: new Cesium.PolylineGlowMaterialProperty({
+                    glowPower: 2,
+                    color: Cesium.Color.YELLOW,
+                }),
+            },
+        });
+
+
+
+
+        // fetching live data from server 
+        const div_data = document.getElementById('data'); // null
+        const timeID = setInterval(get_live_data, 1000); // 1
+        console.log(cur_loc.lat)  // undefined
+
+        // Set the camera to follow the satellite 
+        // viewer.trackedEntity = orbit; 
+
+        let initialized = false;
+        viewer.scene.globe.tileLoadProgressEvent.addEventListener(() => {
+            if (!initialized && viewer.scene.globe.tilesLoaded === true) {
+                viewer.clock.shouldAnimate = true;
+                initialized = true;
+                viewer.scene.camera.zoomOut(7000000);    // Wait for globe to load then zoom out 
+            }
+        });
+
+        // setting camera to ICRF
+
+        const scene = viewer.scene;
+        /* 
+        [object Object]
+        */
+
+        const clock = viewer.clock;
+        /*
+        jH {startTime: Ct, stopTime: Ct, clockRange: 0, canAnimate: true, onTick: nw, …}canAnimate: trueclockRange: 0onStop: nw {_listeners: Array(0), _scopes: Array(0), _toRemove: Array(0), _insideRaiseEvent: false}onTick: nw {_listeners: Array(4), _scopes: Array(4), _toRemove: Array(0), _insideRaiseEvent: false}startTime: Ct {dayNumber: 2460644, secondsOfDay: 72698.941}stopTime: Ct {dayNumber: 2460645, secondsOfDay: 72698.941}_clockStep: 1_currentTime: Ct {dayNumber: 2460644, secondsOfDay: 72698.941}_lastSystemTime: 2547.0999999996275_multiplier: 1_shouldAnimate: falseclockStep: (...)currentTime: (...)multiplier: (...)shouldAnimate: (...)[[Prototype]]: Object
+        MX:338 
+        */
+
+
+        function icrf(scene, time) {
+            if (scene.mode !== Cesium.SceneMode.SCENE3D) { return; }
+
+            const icrfToFixed = Cesium.Transforms.computeIcrfToFixedMatrix(time);
+            if (Cesium.defined(icrfToFixed)) {
+                const camera = viewer.camera;
+                const offset = Cesium.Cartesian3.clone(camera.position);
+                const transform = Cesium.Matrix4.fromRotationTranslation(
+                    icrfToFixed
+                );
+                camera.lookAtTransform(transform, offset);
+            }
+        }
+
+        function viewInICRF() {
+            viewer.camera.flyHome(0);
+            //clock.multiplier = 3 * 60;
+            scene.postUpdate.addEventListener(icrf);
+
+        }
+        //viewInICRF();
+        var location2 = {}
+        const successCallback = (position) => {
+            location2 = position.coords;
+            //console.log(location);
+
+        };
+
+        const errorCallback = (error) => {
+            console.log(error);
+        };
+
+
+
+        // ADDING SATELLITE 3D OBJECT
+        async function loadModel() {
+            // Load the glTF model from Cesium ion.
+            const satelliteUri = await Cesium.IonResource.fromAssetId(2099905);
+            const satelliteEntity = viewer.entities.add({
+                position: positionsOverTime,
+
+                model: {
+                    uri: satelliteUri,
+                    minimumPixelSize: 50028,
+                    maximumScale: 90000,
+                },
+                orientation: new Cesium.VelocityOrientationProperty(positionsOverTime),
+                path: new Cesium.PathGraphics({ width: 3 })
+            });
+
+        }
+
+
+
+
+        var footPrintIntervalIDs = []
+        var satelliteNameIntervalIDMap = {}
+        var previousPointsOffNadirPoints = {};
+        var globalFootPrintCollectionArray = [];                                            // sensor.swath not define
+        var instrument = { 'off_nadir_angle': 0.2, 'off_nadir_direction': 0, 'swath_width': 7, 'resolution': 0.28, 'speed': 7000};
+        instrument['swath_width'] *= 1000;
+
+        function getGroundCartesian(cartesian) {
+
+            var cartographic = Cesium.Cartographic.fromCartesian(cartesian);
+            var longitude = Cesium.Math.toDegrees(cartographic.longitude);
+            var latitude = Cesium.Math.toDegrees(cartographic.latitude);
+
+            var groundCartesian = Cesium.Cartesian3.fromDegrees(longitude, latitude);
+            return groundCartesian
+        }
+        function getHeading(origin, destination) {
+            var direction;
+            if (origin.latitude < destination.latitude) {
+                direction = "North"
+            } else {
+                direction = "South"
+            }
+            return direction;
+        }
+
+        function sinDegrees(angle) { return Math.sin(angle / 180 * Math.PI); };
+
+        function drawPoint(cartesian, label, color) {
+            var entity = viewer.entities.add({
+                position: cartesian,
+                name: label,
+                point: {
+                    pixelSize: 3,
+                    color: color
+                }
+            });
+            return entity;
+        }
+        function drawLine(cartesian1, cartesian2, label, followSurface) {
+
+            var cartographic1 = Cesium.Cartographic.fromCartesian(cartesian1);
+            var longitude1 = Cesium.Math.toDegrees(cartographic1.longitude);
+            var latitude1 = Cesium.Math.toDegrees(cartographic1.latitude);
+            var height1 = cartographic1.height;
+
+
+            var cartographic2 = Cesium.Cartographic.fromCartesian(cartesian2);
+            var longitude2 = Cesium.Math.toDegrees(cartographic2.longitude);
+            var latitude2 = Cesium.Math.toDegrees(cartographic2.latitude);
+            var height2 = cartographic2.height;
+
+            var entity = viewer.entities.add({
+                name: label,
+                polyline: {
+                    positions: Cesium.Cartesian3.fromDegreesArrayHeights([longitude1, latitude1, height1,
+                        longitude2, latitude2, height2]),
+                    width: 1,
+                    followSurface: followSurface,
+                    material: Cesium.Color.YELLOW
+                }
+            });
+            return entity;
+        }
+
+
+        function drawOffNadirPolygon(points1, points2, satelliteName, validOverpass) {
+
+            var color;
+            if (validOverpass) {
+                color = Cesium.Color.fromAlpha(Cesium.Color.GREEN, 0.5)
+            } else {
+                color = Cesium.Color.fromAlpha(Cesium.Color.RED, 0.5)
+            }
+
+            var p1, p2, p3, p4;
+            if (satelliteName == 'AEOLUS') {
+                p1 = points1[2];
+                p2 = points1[3];
+                p3 = points2[3];
+                p4 = points2[2];
+            } else {
+                p1 = points1[3];
+                p2 = points1[4];
+                p3 = points2[4];
+                p4 = points2[3];
+            }
+
+            var cesiumPolygon = viewer.entities.add({
+                polygon: {
+                    hierarchy: [p1, p2, p3, p4],
+                    material: color
+                }
+            });
+            return cesiumPolygon;
+        }
+
+
+
+        // TODO: Refactor, some functionality repeated from getSwathPoints
+        function drawOffNadirFootprint(satellite, instrument, timestamp) {
+
+            var satelliteName = 'CARTOSAT'
+
+            // get three points on the same plane
+            var A = satellite.getValue(timestamp);
+            var B = getGroundCartesian(A);
+            var C = satellite.getValue({ 'dayNumber': timestamp.dayNumber, 'secondsOfDay': timestamp.secondsOfDay + 120.0 });
+            // console.log(satellite.getValue);
+            // console.log(satellite.position)
+            // console.log(satellite)
+            if (C === undefined) {
+
+                return;
+            }
+            var origin = Cesium.Cartographic.fromCartesian(A);
+            var destination = Cesium.Cartographic.fromCartesian(C);
+            var direction = getHeading(origin, destination);
+
+            // get two vectors on the plane using those points
+            var AB = new Cesium.Cartesian3(B.x - A.x, B.y - A.y, B.z - A.z);
+            var AC = new Cesium.Cartesian3(C.x - A.x, C.y - A.y, C.z - A.z);
+
+
+            // get a vector normal to the plane
+            var normal = new Cesium.Cartesian3();
+            Cesium.Cartesian3.cross(AB, AC, normal);
+
+
+
+            /*	if(direction == "South" && instrument.name != "SLSTR (Oblique)"){
+              var newNormal = new Cesium.Cartesian3()
+              newNormal = Cesium.Cartesian3.negate(normal, newNormal);
+              normal = newNormal;
+            }*/
+
+            // get side of triangle opposite nadir angle
+            // @HACK temporary solution to enable swath view for nadir satellites
+            // @TODO The whole OPOT tool JS is an unholy mess needs massive cleaning and refactor
+            var angleA = isNaN(instrument.off_nadir_angle) ? 0.5 : instrument.off_nadir_angle;
+
+            var angleB = 90.0;
+
+            var sideC = Cesium.Cartesian3.distance(A, B);
+            var angleC = 180.0 - angleA - angleB;
+            // console.log(angleC)
+            var sinC = sinDegrees(angleC);
+            var sideB = sideC / sinC;
+            var sideA = Math.sqrt((sideB * sideB) - (sideC * sideC));
+
+            // get point perpendicular to satellite ground location, reassign it to C
+            var ray = new Cesium.Ray(B, normal);
+            C = Cesium.Ray.getPoint(ray, sideA);
+
+            // get point on ground defining end of satellites viewing area
+            var directionAC = new Cesium.Cartesian3();
+            Cesium.Cartesian3.subtract(C, A, directionAC);
+            var ray2 = new Cesium.Ray(A, directionAC);
+            var intersection = Cesium.IntersectionTests.rayEllipsoid(ray2, viewer.scene.globe.ellipsoid);
+            C = Cesium.Ray.getPoint(ray2, intersection.start);
+            // console.log(C, directionAC)
+            // TODO: Special case, only instruments which looks directly back
+            // along direction of travel. Needs refactoring to use off_nadir_angle
+            if (instrument.off_nadir_direction == 180.0 || instrument.off_nadir_direction == 0.0) {
+
+                //// get plane perpendicular to travel
+
+                // get two vectors on the plane using those points
+                var AB = new Cesium.Cartesian3(B.x - A.x, B.y - A.y, B.z - A.z);
+                var AC = new Cesium.Cartesian3(C.x - A.x, C.y - A.y, C.z - A.z);
+                // console.log(AC)
+                // get a vector normal to the plane
+                var normal = new Cesium.Cartesian3();
+                Cesium.Cartesian3.cross(AB, AC, normal);
+
+                if (instrument.off_nadir_direction == 0.0) {
+                    var newNormal = new Cesium.Cartesian3()
+                    newNormal = Cesium.Cartesian3.negate(normal, newNormal);
+                    normal = newNormal;
+                }
+
+                // get side of triangle opposite nadir angle
+                var angleA = instrument.off_nadir_angle; // off-nadir angle
+                var angleB = 90.0;
+
+                var sideC = Cesium.Cartesian3.distance(A, B);
+                var angleC = 180.0 - angleA - angleB;
+                var sinC = sinDegrees(angleC);
+                var sideB = sideC / sinC;
+                var sideA = Math.sqrt((sideB * sideB) - (sideC * sideC));
+
+                // get point perpendicular to satellite ground location, reassign it to C
+                var ray = new Cesium.Ray(B, normal);
+                C = Cesium.Ray.getPoint(ray, sideA);
+
+                // get point on ground defining end of satellites viewing area
+                var directionAC = new Cesium.Cartesian3();
+                Cesium.Cartesian3.subtract(C, A, directionAC);
+                var ray2 = new Cesium.Ray(A, directionAC);
+                var intersection = Cesium.IntersectionTests.rayEllipsoid(ray2, viewer.scene.globe.ellipsoid);
+                C = Cesium.Ray.getPoint(ray2, intersection.start);
+                //// get plane perpendicular satellite instrument line of site
+
+                // get two vectors on the plane using those points
+                var AB = new Cesium.Cartesian3(B.x - A.x, B.y - A.y, B.z - A.z);
+                var AC = new Cesium.Cartesian3(C.x - A.x, C.y - A.y, C.z - A.z);
+
+                // get a vector normal to the plane
+                var normal = new Cesium.Cartesian3();
+                Cesium.Cartesian3.cross(AB, AC, normal);
+
+                var ray = new Cesium.Ray(C, normal);
+                D = Cesium.Ray.getPoint(ray, instrument.swath_width / 2.0);
+                E = Cesium.Ray.getPoint(ray, -instrument.swath_width / 2.0);
+                // console.log(D,E)
+                D = getGroundCartesian(D);
+                E = getGroundCartesian(E);
+                // console.log(D,E)
+
+
+
+            } else {
+                // Special case, only instrument whose line of sight points to the side of the swath, rather than the middle
+                if (satelliteName == "AEOLUS") {
+                    // get point on ground defining start of satellties viewing area
+                    var geodesic1 = new Cesium.EllipsoidGeodesic(Cesium.Cartographic.fromCartesian(C), Cesium.Cartographic.fromCartesian(B));
+                    var newCartographic1 = geodesic1.interpolateUsingSurfaceDistance(instrument.swath_width);
+                    var D = Cesium.Cartesian3.fromDegrees(Cesium.Math.toDegrees(newCartographic1.longitude), Cesium.Math.toDegrees(newCartographic1.latitude))
+                } else {
+                    var geodesic1 = new Cesium.EllipsoidGeodesic(Cesium.Cartographic.fromCartesian(B), Cesium.Cartographic.fromCartesian(C));
+                    var newCartographic1 = geodesic1.interpolateUsingSurfaceDistance(geodesic1.surfaceDistance + instrument.swath_width / 2.0);
+                    var D = Cesium.Cartesian3.fromDegrees(Cesium.Math.toDegrees(newCartographic1.longitude), Cesium.Math.toDegrees(newCartographic1.latitude))
+
+                    var geodesic2 = new Cesium.EllipsoidGeodesic(Cesium.Cartographic.fromCartesian(C), Cesium.Cartographic.fromCartesian(B));
+                    var newCartographic2 = geodesic2.interpolateUsingSurfaceDistance(instrument.swath_width / 2.0);
+                    var E = Cesium.Cartesian3.fromDegrees(Cesium.Math.toDegrees(newCartographic2.longitude), Cesium.Math.toDegrees(newCartographic2.latitude))
+                }
+
+            }
+
+            var footPrintCollection = new Cesium.EntityCollection();
+
+            var points;
+            if (satelliteName == "AEOLUS") {
+                points = [A, B, C, D];
+
+                footPrintCollection.add(drawPoint(points[0], 'A', Cesium.Color.RED));
+                footPrintCollection.add(drawPoint(points[2], 'A', Cesium.Color.RED));
+                footPrintCollection.add(drawPoint(points[3], 'A', Cesium.Color.RED));
+
+                footPrintCollection.add(drawLine(points[0], points[3], 'b', false));
+                footPrintCollection.add(drawLine(points[0], points[2], 'b', false));
+            } else {
+                points = [A, B, C, D, E];
+                // console.log(points)
+                footPrintCollection.add(drawPoint(points[0], 'A', Cesium.Color.RED));
+                footPrintCollection.add(drawPoint(points[3], 'A', Cesium.Color.RED));
+                footPrintCollection.add(drawPoint(points[4], 'A', Cesium.Color.RED));
+
+                footPrintCollection.add(drawLine(points[0], points[3], 'b', false));
+                footPrintCollection.add(drawLine(points[0], points[4], 'b', false));
+            }
+
+            if (previousPointsOffNadirPoints[satelliteName]) {
+                var polygon = drawOffNadirPolygon(previousPointsOffNadirPoints[satelliteName], points, satelliteName, true)
+                footPrintCollection.add(polygon);
+            }
+            previousPointsOffNadirPoints[satelliteName] = points;
+            return footPrintCollection;
+        }
+
+
+        // const timeID = setInterval(timeAndDate, 1000);
+        satelliteNameIntervalIDMap = { 'CARTOSAT 3': 44804 }
+
+        function drawFootPrintInterval(satellite, instrumentName, riseTimeJulian, setTimeJulian) {
+            const satName = 'CARTOSAT 3'
+            previousPointsOffNadirPoints = {};
+
+            var footPrintCollectionArray = [];
+
+            var footprintParameters = getFootprintParameters(instrument);
+
+            if (satellite.getValue(clock.currentTime)) {
+                var footPrintCollection = drawFootPrintMain2(satellite, instrument, clock.currentTime);
+                footPrintCollectionArray.push(footPrintCollection);
+                globalFootPrintCollectionArray.push(footPrintCollection);
+            }
+
+            // clears interval displaying previous interval when cycling through instruments
+            var currentIntervalID = satelliteNameIntervalIDMap[satName];
+            if (currentIntervalID) {
+                clearInterval(currentIntervalID);
+            }
+
+            var intervalID = setInterval(function () {
+                // remove excess instrument footprints from globe
+                if (footPrintCollectionArray.length >= footprintParameters.numberOfFootPrintsAtAtime) {
+                    var entities = footPrintCollectionArray[0].values;
+                    footPrintCollectionArray.splice(0, 1);
+
+                    for (var i = 0; i < entities.length; i++) {
+                        viewer.entities.remove(entities[i]);
+                    }
+                }
+
+                if (satellite.getValue(clock.currentTime)) {
+                    var footPrintCollection = drawFootPrintMain2(satellite, instrument, clock.currentTime);
+                    footPrintCollectionArray.push(footPrintCollection);
+                    globalFootPrintCollectionArray.push(footPrintCollection);
+                }
+            }, footprintParameters.intervalBetweenFootPrints);
+
+            satelliteNameIntervalIDMap[satName] = intervalID;
+            footPrintIntervalIDs.push(intervalID);
+
+            function drawFinalFootprint(clock) {
+                if (clock.currentTime.equalsEpsilon(setTimeJulian, 2)) {
+                    var footPrintCollection = drawFootPrintMain2(satellite, instrument, clock.currentTime);
+                    footPrintCollectionArray.push(footPrintCollection);
+                    globalFootPrintCollectionArray.push(footPrintCollection);
+
+                    clearInterval(intervalID)
+                    viewer.clock.onTick.removeEventListener(drawFinalFootprint);
+                }
+            }
+
+            viewer.clock.onTick.addEventListener(drawFinalFootprint);
+        }
+
+        function drawFootPrintMain2(satellite, instrument, timestamp) {
+            var colour = Cesium.color;
+            var satColour = new Cesium.Color(255, 0, 0, 0.3);
+
+            var cartesian = satellite.getValue(clock.currentTime);
+            var cartographic = Cesium.Cartographic.fromCartesian(cartesian);
+
+            var footPrintCollection = new Cesium.EntityCollection();
+
+            if (instrument.off_nadir_angle) {
+
+                footPrintCollection = drawOffNadirFootprint(satellite, instrument, timestamp)
+            } else {
+                var entity = drawInstrumentFootPrintSwathWidth(cartographic, instrument, satColour);
+                footPrintCollection.add(entity);
+            }
+
+            return footPrintCollection;
+        }
+
+        function getFootprintParameters(instrument) {
+
+            var secondMultiplier = instrument.swath_width / 4000;  // for every 250km of swath width, add one second between footprints
+            // var intervalBetweenFootPrints = 1000.0 * secondMultiplier;
+            var intervalBetweenFootPrints = 1000.0
+            if (intervalBetweenFootPrints > 4000) {
+                intervalBetweenFootPrints = 4000;
+            } else if (intervalBetweenFootPrints < 500) {
+                intervalBetweenFootPrints = 1000;
+            }
+            var numberOfFootPrintsAtAtime = parseInt(30 / Math.ceil(2));
+
+            return { 'numberOfFootPrintsAtAtime': numberOfFootPrintsAtAtime, 'intervalBetweenFootPrints': intervalBetweenFootPrints };
+        }
+
+
+        // draws footprint of satellite based on its swath width of its instrument along the ground
+        function drawInstrumentFootPrintSwathWidth(cartographic, instrument, satColour) {
+
+            var longitude = Cesium.Math.toDegrees(cartographic.longitude)
+            var latitude = Cesium.Math.toDegrees(cartographic.latitude)
+            var height = cartographic.height;
+
+            // centre of the cone should be half the height of satellite, which puts apex at the satellites position
+            var position = Cesium.Cartesian3.fromDegrees(longitude, latitude, height / 2);
+
+            var cone = viewer.entities.add({
+                name: 'Satellite Field of View',
+                position: position,
+                cylinder: {
+                    length: height,
+                    topRadius: 0.0,
+                    bottomRadius: instrument.swath_width / 2.0,
+                    material: satColour,
+                    outline: true,
+                    outlineColor: Cesium.Color.RED.withAlpha(0.5)
+                }
+            });
+            return cone;
+        }
+
+        drawFootPrintInterval(positionsOverTime, instrument, start, stop);
+        loadModel();
+
+        // function timeAndDate(){
+        //   drawOffNadirFootprint(positionsOverTime, instrument, clock.currentTime);
+        //   console.log(globalFootPrintCollectionArray)
+        // }
+        // const st = setInterval( timeAndDate, 1000)
+
+
+
+    </script>
+    </div>
+</body>
+<style>
+    body, html {
+        margin: 0;
+        padding: 0;
+        font-family: Arial, sans-serif;
+        height: 400px;
+        display: flex;
+        flex-direction: column;
+    }
+    #cesiumContainer {
+        flex: 1;
+        width: 1000px;
+        background-color: aquamarine;
+    }
+    .info-panel {
+        width: 100%;
+        padding: 10px;
+        box-sizing: border-box;
+        background-color: #e3f2fd;
+        overflow: auto;
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    td {
+        padding: 8px;
+        border: 1px solid #ddd;
+    }
+    td:first-child {
+        font-weight: bold;
+    }
+    .select-box {
+        display: inline-block;
+        margin: 10px 0;
+        padding: 10px;
+        border: none;
+        box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+        background-color: #2980b9;
+        color: #e3f2fd;
+        font-size: 18px;
+        border-radius: 5px;
+    }
+</style>

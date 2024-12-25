@@ -1,0 +1,22 @@
+config
+requests
+numpy
+pandas
+django
+sgp4
+skyfield
+matplotlib
+psycopg2-binary
+urllib3
+python-dotenv
+decouple
+dj-database-url
+gunicorn
+django-crontab
+django
+
+djangorestframework
+markdown       # Markdown support for the browsable API.
+django-filter  
+django-cors-headers
+whitenoise

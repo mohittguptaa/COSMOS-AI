@@ -1,0 +1,193 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="divide">
+  <div class="tle-data">
+    <h3 class="sat-name">{{satellite.name}}</h3>
+    <div style="margin-left: 50px;">
+      <table border="1px solid">
+        <tbody>
+          <tr> <td>Norad ID :</td><td>{{data.norad_id }}</td></tr>
+          <tr> <td>Launch Year :</td><td>20{{data.launch_year}}</td></tr>
+          <tr> <td>First derivative mean motion : </td><td>{{data.first_derivative_mean_motion}}</td></tr>
+          <tr> <td>Second derivative mean motion :</td><td>{{data.second_derivative_mean_motion}}</td></tr>
+          <tr> <td>Bstar :</td><td>{{data.bstar}}</td></tr>
+          <tr> <td>Inclination :</td><td>{{data.inclination}} deg.</td></tr>
+          <tr>  <td>RAAN : </td><td>{{data.RAAN}} deg.</td></tr>
+          <tr> <td>Longitude of ascending node :</td><td>{{data.longitude_of_ascending_node}} deg.</td></tr>
+          <tr> <td>Eccentricity :</td><td>{{data.eccentricity}}</td></tr>
+          <tr> <td>Argument of perigee :</td> <td>{{data.argument_of_perigee}} deg.</td></tr>
+          <tr> <td>Argument of periapsis : </td><td>{{data.argument_of_periapsis}} deg.</td></tr>
+          <tr> <td>Mean anomaly :</td><td>{{data.mean_anomaly}}</td></tr>
+          <tr> <td>Mean motion :</td><td>{{data.mean_motion}}</td></tr>
+          <tr> <td>Semi major axis :</td><td>{{data.semi_major_axis}} km</td></tr>
+          <tr> <td>Period :</td><td>{{data.period}} minutes</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="satellite_details">
+    <div class="sat-tle">
+      <h4>Latest Tle(Two line element) :</h4>
+      <div class="tle">{{ satellite.tle_now }}</div>
+      <div class="last-fetch"><b>Last fetch date: </b> {{ satellite.last_tle_update }}</div>
+      <button id="fetch_tle" type="button" onclick="fetch_latest()" class="buton"> Fetch Again </button>
+      <button class="buton" onclick="compare_tle()" > Compare Prev. TLE </button>
+    </div>
+    <div class="sensors">
+      <h4>Available Sensors :</h6>
+        <table class="t3">
+          <tr>
+            <th>Select</th>
+            <th>Name</th>
+            <th>Resolution Type</th>
+            <th>Resolution [m]</th>
+            <th>swath [km]</th>
+            <th>Tilting type</th>
+            <th>Positive Tilt</th>
+            <th>Negative Tilt</th>
+          </tr>
+          {% for sensor in sensors %}
+          <tr>
+            <td><input type="radio" name="sensor" id="0" value="{{ sensor.name }}" checked="checked"></td>
+            <td>{{ sensor.name }}</td>
+            <td>{{ sensor.resolution_type }}</td>
+            <td>{{ sensor.resolution_value }}</td>
+            <td>{{ sensor.swath }}</td>
+            <td>{{ sensor.tilting_type }}</td>
+            <td>{{ sensor.positive_tilting }}</td>
+            <td>{{ sensor.negative_tilting }}</td>
+
+          </tr>
+          {% endfor %}
+
+        </table>
+        <button class="buton" onclick="get_tracking()">Track 🚀</button>
+
+    </div>
+  </div>
+</div>
+
+
+
+
+<script>
+  function compare_tle(){
+    window.location.href = "{% url 'compare' satellite.norad_id %}";
+  }
+  function get_tracking() {
+
+    var ele = document.getElementsByName('sensor');
+
+    for (i = 0; i < ele.length; i++) {
+      if (ele[i].checked) {
+
+        window.location.href = "{% url 'detail_view' satellite.norad_id %}" + `/${ele[i].value}`;
+      }
+    }
+
+  }
+  function fetch_latest(){
+    window.location.href = "{% url 'fetch' satellite.norad_id %}";
+  }
+</script>
+
+<style>
+  .divide {
+    height: 90vh;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #e3f2fd;
+  }
+
+  .sat-name {
+    margin-left: 48px;
+    font-size: 1.3rem;
+    margin-bottom: 10px;
+  }
+
+  table,
+  th,
+  td {
+    border: 1px solid black;
+    border-collapse: collapse;
+  }
+
+  td,
+  th {
+    padding: 8px;
+  }
+
+  .satellite_details {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6rem;
+  }
+
+  .sat-tle {
+    width: 90%;
+  }
+
+  .sat-tle h4 {
+    margin-bottom: 10px;
+  }
+
+  .sat-tle .tle {
+    margin-bottom: 10px;
+  }
+
+  .tle-data {
+    flex: 0.3;
+  }
+
+  .satellite_details {
+    flex: 0.7;
+  }
+
+  .buton {
+    margin: 10px;
+    background-color: #ffc600;
+    color: rgb(0, 9, 86);
+    font-weight: 600;
+    border-radius: 40px;
+    padding: 10px;
+    box-shadow: 0px 1px 5px 3px rgba(0, 0, 0, 0.12);
+    cursor: pointer;
+  }
+
+  .buton:hover {
+    color: black;
+    background-color: #ffcd1a;
+
+  }
+
+  .buton:active {
+    scale: 0.99;
+  }
+
+  .t3 th {
+    font-weight: 600;
+  }
+
+  .t3 th,
+  .t3 td {
+    border-bottom: 1px solid black;
+    padding: 5px 10px;
+  }
+
+  .sensors {
+    width: 90%;
+    padding: 30px 0;
+  }
+
+  .sensors h4 {
+    margin-bottom: 10px;
+  }
+  .sensors button {
+    margin-top: 10px;
+  }
+</style>
+{% endblock content %}

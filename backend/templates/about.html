@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Satellite Tracker</title>
+    <!-- Include the CesiumJS JavaScript and CSS files -->
+    <script src="https://cesium.com/downloads/cesiumjs/releases/1.107.1/Build/Cesium/Cesium.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/satellite.js/4.0.0/satellite.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <link href="https://cesium.com/downloads/cesiumjs/releases/1.107.1/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            
+            display: flex;
+            flex-direction: column;
+        }
+        #cesiumContainer {
+            flex: 1;
+            background-color: aquamarine;
+        }
+        .info-panel {
+            width: 100%;
+            padding: 10px;
+            box-sizing: border-box;
+            background-color: #e3f2fd;
+            overflow: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        td {
+            padding: 8px;
+            border: 1px solid #ddd;
+        }
+        td:first-child {
+            font-weight: bold;
+        }
+        .select-box {
+            display: inline-block;
+            margin: 10px 0;
+            padding: 10px;
+            border: none;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+            background-color: #2980b9;
+            color: #e3f2fd;
+            font-size: 18px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="cesiumContainer"></div>
+    <div class="info-panel">
+        <table>
+            <tr><td>NORAD ID:</td><td>44804</td></tr>
+            <tr><td>UTC:</td><td id="utc">--</td></tr>
+            <tr><td>LATITUDE:</td><td id="lat">--</td></tr>
+            <tr><td>LONGITUDE:</td><td id="lon">--</td></tr>
+            <tr><td>ALTITUDE [km]:</td><td id="h">--</td></tr>
+            <tr><td>SPEED [km/s]:</td><td id="speed">--</td></tr>
+            <tr><td>AZIMUTH:</td><td id="az">--</td></tr>
+            <tr><td>ELEVATION:</td><td id="ele">--</td></tr>
+            <tr><td>RIGHT ASCENSION:</td><td id="ra">--</td></tr>
+            <tr><td>DECLINATION:</td><td id="dec">--</td></tr>
+        </table>
+    </div>
+
+    <script type="module">
+        Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI4ZjM0YTMzOC04NTIwLTQwMTItYTg5Ni0wOTFhNjlkZTJiYzIiLCJpZCI6MTUzNzcwLCJpYXQiOjE2ODkyNjg2NjV9.JHjxyoN8RovBonODf3w6B654ZNhxvoqCbAqAsKZrxBY'
+
+        // Set up the Cesium Viewer
+        Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI4ZjM0YTMzOC04NTIwLTQwMTItYTg5Ni0wOTFhNjlkZTJiYzIiLCJpZCI6MTUzNzcwLCJpYXQiOjE2ODkyNjg2NjV9.JHjxyoN8RovBonODf3w6B654ZNhxvoqCbAqAsKZrxBY'
+        const viewer = new Cesium.Viewer('cesiumContainer', {
+            terrain: Cesium.Terrain.fromWorldTerrain(),
+        });
+
+        // Initialize position property
+        let positionsOverTime = new Cesium.SampledPositionProperty();
+
+        // Example data setup that would come from a server
+        viewer.clock.startTime = Cesium.JulianDate.fromIso8601("2024-11-30T07:48:35Z");
+        viewer.clock.stopTime = Cesium.JulianDate.fromIso8601("2024-11-30T15:08:35Z");
+        viewer.clock.currentTime = Cesium.JulianDate.fromIso8601("2024-11-30T07:48:35Z");
+        viewer.clock.clockRange = Cesium.ClockRange.CLAMPED;
+        viewer.clock.clockStep = Cesium.ClockStep.SYSTEM_CLOCK_MULTIPLIER;
+        viewer.clock.multiplier = 60;  // Speed up the simulation
+
+        viewer.timeline.zoomTo(viewer.clock.startTime, viewer.clock.stopTime);
+        viewer.scene.globe.enableLighting = true;
+
+        // Sample data: replace this with actual satellite data
+        [
+            {"latitude": 42, "longitude": -87, "height": 1000, "iso_string": "2024-11-30T07:48:35Z"},
+            {"latitude": 45, "longitude": -90, "height": 1000, "iso_string": "2024-11-30T15:08:35Z"}
+        ].forEach((waypoint) => {
+            const time = Cesium.JulianDate.fromIso8601(waypoint.iso_string);
+            const position = Cesium.Cartesian3.fromDegrees(waypoint.longitude, waypoint.latitude, waypoint.height * 1000);
+            positionsOverTime.addSample(time, position);
+        });
+
+        // Create satellite entity
+        const satellite = viewer.entities.add({
+            availability: new Cesium.TimeIntervalCollection([new Cesium.TimeInterval({
+                start: viewer.clock.startTime,
+                stop: viewer.clock.stopTime
+            })]),
+            position: positionsOverTime,
+            point: { pixelSize: 5, color: Cesium.Color.YELLOW },
+            path: {
+                resolution: 120,
+                material: new Cesium.PolylineGlowMaterialProperty({
+                    glowPower: 0.2,
+                    color: Cesium.Color.BLUE
+                }),
+                width: 10
+            }
+        });
+
+        // Information Update
+        const get_live_data = () => {
+            // Update the details table or fetch and update with real-time data
+            document.getElementById('utc').textContent = new Date().toISOString();  // Simplified example
+        };
+
+        setInterval(get_live_data, 1000);
+        viewer.trackedEntity = satellite;
+    </script>
+</body>
+</html>

@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+
+<div class="main-container">
+    <div class="container">
+        <div class="swiper mySwiper">
+            <div class="swiper-wrapper">
+                <div class="swiper-slide"><img src="{% static 'sdsc.jpg' %}" alt=""></div>
+                <div class="swiper-slide"><img src="{% static 'satellite.png' %}" alt=""></div>
+                <div class="swiper-slide"><img src="{% static 'Cartosat-3-catlog.png' %}" alt=""></div>
+                <div class="swiper-slide"><img src="{% static 'PSLV-catlog.jpg' %}" alt=""></div>
+                <div class="swiper-slide"><img src="{% static 'first.jpg' %}" alt=""></div>
+                <div class="swiper-slide"><img src="{% static 'third.jpg' %}" alt=""></div>
+                <div class="swiper-slide"><img src="{% static 'fourth.jpg' %}" alt=""></div>
+                <div class="swiper-slide"><img src="{% static 'fifth.jpg' %}" alt=""></div>
+                <div class="swiper-slide"><img src="{% static 'sixth.jpg' %}" alt=""></div>
+                <div class="swiper-slide"><img src="{% static 'seventh.jpg' %}" alt=""></div>
+            </div>
+            <div class="swiper-button-next"></div>
+            <div class="swiper-button-prev"></div>
+            <div class="swiper-pagination"></div>
+        </div>
+    </div>
+</div>
+<script type='module'>
+
+    var swiper = new Swiper(".mySwiper", {
+        spaceBetween: 30,
+        centeredSlides: true,
+        autoplay: {
+            delay: 2500,
+            disableOnInteraction: false,
+        },
+        pagination: {
+            el: ".swiper-pagination",
+            clickable: true,
+        },
+        navigation: {
+            nextEl: ".swiper-button-next",
+            prevEl: ".swiper-button-prev",
+        },
+    });
+</script>
+
+<style>
+    .main-container {
+        height: 92vh;
+        position: relative;
+    }
+
+    .container {
+        height: 92vh;
+    }
+
+    .swiper {
+        width: 100%;
+        height: 100%;
+    }
+
+    .swiper-slide {
+        text-align: center;
+        font-size: 18px;
+        background: #fff;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .swiper-slide img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        background-repeat: no-repeat;
+        background-position: center;
+        background-size: cover;
+    }
+</style>
+
+{% endblock content %}
